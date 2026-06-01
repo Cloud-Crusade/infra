@@ -11,6 +11,9 @@
 *.tfplan
 *.tfplan.json
 
+# 잠재적으로 민감한 정보가 포함될 수 있는 파일
+.terraform.lock.hcl
+
 # 크래시 로그
 crash.log
 crash.*.log
