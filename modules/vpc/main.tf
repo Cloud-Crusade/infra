@@ -57,7 +57,7 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table" "private" {
-  count = var.enable_nat_gateway ? length(var.private_subnet_cidrs) : 0
+  count  = var.enable_nat_gateway ? length(var.private_subnet_cidrs) : 0
   vpc_id = aws_vpc.this.id
 
   route {

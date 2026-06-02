@@ -40,3 +40,36 @@ variable "enable_nat_gateway" {
   type        = bool
   default     = false
 }
+
+variable "bastion_ami" {
+  description = "Bastion Host AMI"
+  type        = string
+}
+
+variable "bastion_instance_type" {
+  description = "Bastion host 인스턴스 타입"
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "bastion_key_name" {
+  description = "Bastion Host SSH 키페어 이름"
+  type        = string
+}
+
+variable "allowed_ssh_cidrs" {
+  description = "Bastion host SSH 접근 허용 IP 목록"
+  type        = list(string)
+}
+
+variable "bastion_sg_id" {
+  type = string
+}
+
+variable "rds_sg_id" {
+  type = string
+}
+
+variable "eks_sg_id" {
+  type = string
+}

@@ -105,3 +105,8 @@ EX
         └── terraform.tfvars
 ```
 
+# Bastion host 키 생성
+
+```
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/bastion-key
+```

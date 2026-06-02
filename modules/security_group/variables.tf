@@ -9,8 +9,8 @@ variable "environment" {
 }
 
 variable "vpc_id" {
-    description = "vpc id"
-    type = string
+  description = "vpc id"
+  type        = string
 }
 
 variable "allowed_ssh_cidrs" {
