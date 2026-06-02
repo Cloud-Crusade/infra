@@ -1,0 +1,26 @@
+name: Terraform Plan
+
+on:
+  pull_request:
+    branches: ["**"]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: environments
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: environments
+        run: terraform plan -no-color -var-file="dev/terraform.tfvars"
