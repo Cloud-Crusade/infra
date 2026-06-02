@@ -61,15 +61,3 @@ variable "allowed_ssh_cidrs" {
   description = "Bastion host SSH 접근 허용 IP 목록"
   type        = list(string)
 }
-
-variable "bastion_sg_id" {
-  type = string
-}
-
-variable "rds_sg_id" {
-  type = string
-}
-
-variable "eks_sg_id" {
-  type = string
-}

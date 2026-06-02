@@ -10,3 +10,5 @@ availability_zones   = ["ap-northeast-2a", "ap-northeast-2c"]
 bastion_ami           = "ami-0a10b2721688ce9d2" # KT Cloud AMI ID
 bastion_instance_type = "t3.micro"
 bastion_key_name      = "bastion-key"
+
+allowed_ssh_cidrs = ["0.0.0.0/0"]
