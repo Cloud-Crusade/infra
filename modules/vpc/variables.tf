@@ -27,3 +27,9 @@ variable "availability_zones" {
   description = "사용할 가용 영역 목록"
   type        = list(string)
 }
+
+variable "enable_nat_gateway" {
+  description = "NAT Gateway 생성 여부"
+  type        = bool
+  default     = true
+}
