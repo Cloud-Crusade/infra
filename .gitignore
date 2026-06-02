@@ -1,0 +1,46 @@
+# Terraform 로컬 디렉토리 및 캐시
+**/.terraform/*
+.terraform/
+
+# 상태 파일 (원격 backend 사용으로 로컬 보관 불필요)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Plan 파일
+*.tfplan
+*.tfplan.json
+
+# 잠재적으로 민감한 정보가 포함될 수 있는 파일
+.terraform.lock.hcl
+
+# 크래시 로그
+crash.log
+crash.*.log
+
+# 로컬 오버라이드 파일
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# 민감 정보가 포함될 수 있는 파일
+*.auto.tfvars
+secrets.tfvars
+*.pem
+*.key
+
+# CLI 설정 파일
+.terraformrc
+terraform.rc
+
+# OS 파일
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.claude
