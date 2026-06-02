@@ -1,19 +1,19 @@
-output "primary_1_endpoint" {
-  value = aws_db_instance.primary_1.endpoint
+output "primary_endpoint" {
+  value = aws_db_instance.primary.endpoint
 }
 
-output "replica_1_endpoint" {
-  value = aws_db_instance.replica_1.endpoint
+output "primary_replica_endpoint" {
+  value = aws_db_instance.primary_replica.endpoint
 }
 
-output "primary_2_endpoint" {
-  value = aws_db_instance.primary_2.endpoint
+output "reservation_endpoint" {
+  value = aws_db_instance.reservation.endpoint
 }
 
-output "replica_2a_endpoint" {
-  value = aws_db_instance.replica_2a.endpoint
+output "reservation_replica_endpoint" {
+  value = aws_db_instance.reservation_replica.endpoint
 }
 
-output "replica_2b_endpoint" {
-  value = aws_db_instance.replica_2b.endpoint
+output "reservation_replica_2_endpoint" {
+  value = aws_db_instance.reservation_replica_2.endpoint
 }

@@ -37,11 +37,6 @@ variable "allocated_storage" {
   default     = 20
 }
 
-variable "subnet_ids" {
-  description = "RDS가 배치될 서브넷 ID 목록"
-  type        = list(string)
-}
-
 variable "vpc_security_group_ids" {
   description = "RDS에 적용할 보안 그룹 ID 목록"
   type        = list(string)

@@ -1,11 +1,7 @@
-resource "aws_db_subnet_group" "db_sg" {
-  name       = "${var.project_name}-db-subnet-group"
-  subnet_ids = var.subnet_ids
-}
 
-# Primary DB #1
-resource "aws_db_instance" "primary_1" {
-  identifier        = "${var.project_name}-primary-1"
+# Primary DB 
+resource "aws_db_instance" "primary" {
+  identifier        = "${var.project_name}-primary"
   allocated_storage = var.allocated_storage
   engine            = "postgres"
   engine_version    = var.engine_version
@@ -25,11 +21,11 @@ resource "aws_db_instance" "primary_1" {
   backup_retention_period = 1
 }
 
-# Replica #1
-resource "aws_db_instance" "replica_1" {
-  identifier          = "${var.project_name}-replica-1"
+# Primary DB_replica
+resource "aws_db_instance" "primary_replica" {
+  identifier          = "${var.project_name}-primary-replica"
   instance_class      = var.instance_class
-  replicate_source_db = aws_db_instance.primary_1.id
+  replicate_source_db = aws_db_instance.primary.id
 
   availability_zone = var.azs[0]
 
@@ -41,9 +37,9 @@ resource "aws_db_instance" "replica_1" {
 }
 
 
-# Primary DB #2
-resource "aws_db_instance" "primary_2" {
-  identifier        = "${var.project_name}-primary-2"
+# Reservation
+resource "aws_db_instance" "reservation" {
+  identifier        = "${var.project_name}-reservation"
   allocated_storage = var.allocated_storage
   engine            = "postgres"
   engine_version    = var.engine_version
@@ -64,11 +60,11 @@ resource "aws_db_instance" "primary_2" {
 }
 
 
-# Replica 2a
-resource "aws_db_instance" "replica_2a" {
-  identifier          = "${var.project_name}-replica-2a"
+# Reservation_replica
+resource "aws_db_instance" "reservation_replica" {
+  identifier          = "${var.project_name}-reservation-replica"
   instance_class      = var.instance_class
-  replicate_source_db = aws_db_instance.primary_2.id
+  replicate_source_db = aws_db_instance.reservation.id
 
   availability_zone = var.azs[1]
 
@@ -80,11 +76,11 @@ resource "aws_db_instance" "replica_2a" {
 }
 
 
-# Replica 2b
-resource "aws_db_instance" "replica_2b" {
-  identifier          = "${var.project_name}-replica-2b"
+# Reservation_replica_2
+resource "aws_db_instance" "reservation_replica_2" {
+  identifier          = "${var.project_name}-reservation-replica-2"
   instance_class      = var.instance_class
-  replicate_source_db = aws_db_instance.primary_2.id
+  replicate_source_db = aws_db_instance.reservation.id
 
   availability_zone = var.azs[1]
 
