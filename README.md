@@ -96,17 +96,18 @@ EX
 │       └── variables.tf
 │
 └── environments/
-    ├── main.tf
-    ├── backend.tf
     ├── dev/
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   ├── outputs.tf
     │   └── terraform.tfvars
     │
     └── prod/
+        ├── main.tf
+        ├── variables.tf
+        ├── outputs.tf
         └── terraform.tfvars
 ```
 
-# Bastion host 키 생성
+> 각 환경(`dev`, `prod`)은 독립적인 `main.tf` 진입점을 가지며, 환경별로 분리되어 실행된다.
 
-```
-ssh-keygen -t rsa -b 4096 -f ~/.ssh/bastion-key
-```
