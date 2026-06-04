@@ -43,6 +43,6 @@ variable "vpc_security_group_ids" {
 }
 
 variable "azs" {
-  description = "RDS를 배치할 가용 영역"
+  description = "RDS를 배치할 가용 영역 (반드시 리스트 타입으로 입력)"
   type        = list(string)
 }
