@@ -7,6 +7,7 @@ variable "aws_region" {
 variable "environment" {
   description = "배포 환경 (dev | prod)"
   type        = string
+  default     = "dev"
 
   validation {
     condition     = contains(["dev", "prod"], var.environment)
