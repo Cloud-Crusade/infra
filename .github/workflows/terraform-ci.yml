@@ -7,8 +7,13 @@ on:
 
 jobs:
   terraform-plan:
-    name: Terraform Plan
+    name: Terraform Plan (${{ matrix.environment }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prod]
 
     steps:
       - name: Checkout
@@ -18,9 +23,9 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        working-directory: environments
+        working-directory: environments/${{ matrix.environment }}
         run: terraform init
 
       - name: Terraform Plan
-        working-directory: environments
-        run: terraform plan -no-color -var-file="dev/terraform.tfvars"
+        working-directory: environments/${{ matrix.environment }}
+        run: terraform plan -no-color
