@@ -12,21 +12,25 @@ variable "private_key_value" {
   description = "JWT 서명용 Private Key 값"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "rds_username" {
   description = "RDS 접속 username"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "rds_password" {
   description = "RDS 접속 password"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "rds_writer_endpoint" {
   description = "RDS Writer 엔드포인트 주소"
   type        = string
+  default     = ""
 }
