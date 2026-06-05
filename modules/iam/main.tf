@@ -116,7 +116,7 @@ resource "aws_iam_role" "ebs_csi" {
 # CloudWatch 로그 쓰기 권한
 resource "aws_iam_policy" "lambda_logging" {
   name        = "${var.project_name}-lambda-logging-policy"
-  description = "Lambda가 CloudWatch에 로그를 쓸 수 있는 최소 권한"
+  description = "Lambda minimum policy for CloudWatch logging"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -137,7 +137,7 @@ resource "aws_iam_policy" "lambda_logging" {
 # Secrets Manager 읽기 권한
 resource "aws_iam_policy" "lambda_secrets" {
   name        = "${var.project_name}-lambda-secrets-policy"
-  description = "Lambda가 Secrets Manager에서 토큰 서명 키를 읽을 수 있는 최소 권한"
+  description = "Lambda minimum policy for Secrets Manager read"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -157,7 +157,7 @@ resource "aws_iam_policy" "lambda_secrets" {
 # ElastiCache 접근 권한
 resource "aws_iam_policy" "eks_elasticache" {
   name        = "${var.project_name}-eks-elasticache-policy"
-  description = "EKS 노드가 ElastiCache에 접근할 수 있는 권한"
+  description = "EKS node minimum policy for ElastiCache access"
 
   policy = jsonencode({
     Version = "2012-10-17"
