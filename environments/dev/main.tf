@@ -41,3 +41,14 @@ module "security_groups" {
   vpc_id            = module.vpc.vpc_id
   allowed_ssh_cidrs = var.allowed_ssh_cidrs
 }
+
+module "secrets_manager" {
+  source = "../../modules/secrets_manager"
+
+  project_name        = var.project_name
+  environment         = var.environment
+  private_key_value   = var.private_key_value
+  rds_username        = var.rds_username
+  rds_password        = var.rds_password
+  rds_writer_endpoint = var.rds_writer_endpoint
+}
