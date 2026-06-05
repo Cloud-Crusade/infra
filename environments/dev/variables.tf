@@ -67,3 +67,15 @@ variable "allowed_ssh_cidrs" {
   description = "Bastion host SSH 접근 허용 IP 목록"
   type        = list(string)
 }
+
+variable "oidc_provider_arn" {
+  description = "EKS OIDC Provider ARN"
+  type        = string
+  default     = ""
+}
+
+variable "oidc_provider_url" {
+  description = "EKS OIDC Provider URL"
+  type        = string
+  default     = ""
+}

@@ -40,3 +40,15 @@ variable "availability_zones" {
   description = "사용할 가용 영역 목록"
   type        = list(string)
 }
+
+variable "oidc_provider_arn" {
+  description = "EKS OIDC Provider ARN"
+  type        = string
+  default     = ""
+}
+
+variable "oidc_provider_url" {
+  description = "EKS OIDC Provider URL"
+  type        = string
+  default     = ""
+}
