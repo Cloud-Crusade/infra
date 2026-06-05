@@ -1,6 +1,6 @@
 resource "aws_security_group" "bastion" {
   name        = "${var.project_name}-${var.environment}-bastion-sg"
-  description = "Bastion host에 적용하는 Security Group"
+  description = "Security Group for Bastion host"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -24,7 +24,7 @@ resource "aws_security_group" "bastion" {
 
 resource "aws_security_group" "rds" {
   name        = "${var.project_name}-${var.environment}-rds-sg"
-  description = "RDS에 적용하는 Security Group"
+  description = "Security Group for RDS instances"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -48,7 +48,7 @@ resource "aws_security_group" "rds" {
 
 resource "aws_security_group" "eks" {
   name        = "${var.project_name}-${var.environment}-eks-sg"
-  description = "EKS에 적용하는 Security Group"
+  description = "Security Group for EKS"
   vpc_id      = var.vpc_id
 
   ingress {
