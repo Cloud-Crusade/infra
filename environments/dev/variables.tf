@@ -79,9 +79,7 @@ variable "oidc_provider_url" {
   type        = string
   default     = ""
 }
-# 민감값은 CI plan 에 주입하지 않고(빈 기본값) 실제 값은 apply 시
-# gitignore 된 secrets.tfvars 등으로 공급한다. 기본값이 없으면 plan 이
-# 대화형 입력을 요구해 비대화형 CI 에서 멈춘다.
+
 variable "private_key_value" {
   description = "JWT 서명용 Private Key 값"
   type        = string
