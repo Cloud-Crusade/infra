@@ -5,11 +5,11 @@
 # Private Key 시크릿
 # Lambda가 JWT 토큰 서명 시 사용하는 비공개 키
 resource "aws_secretsmanager_secret" "private_key" {
-  name        = "${var.project_name}-${var.environment}-private-key"
+  name        = "${var.environment}-private-key"
   description = "JWT 서명용 Private Key"
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-private-key"
+    Name = "${var.environment}-private-key"
   }
 }
 
@@ -21,11 +21,11 @@ resource "aws_secretsmanager_secret_version" "private_key" {
 # RDS 접속 정보 시크릿
 # EKS Pod 및 Lambda가 RDS 접속 시 사용
 resource "aws_secretsmanager_secret" "rds_credentials" {
-  name        = "${var.project_name}-${var.environment}-rds-credentials"
+  name        = "${var.environment}-rds-credentials"
   description = "RDS 접속 정보 (username, password)"
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-rds-credentials"
+    Name = "${var.environment}-rds-credentials"
   }
 }
 
@@ -40,11 +40,11 @@ resource "aws_secretsmanager_secret_version" "rds_credentials" {
 # RDS Writer 엔드포인트 시크릿
 # AZ 장애 시 동적 전환을 위한 Writer 엔드포인트
 resource "aws_secretsmanager_secret" "rds_writer_endpoint" {
-  name        = "${var.project_name}-${var.environment}-rds-writer-endpoint"
+  name        = "${var.environment}-rds-writer-endpoint"
   description = "RDS Writer 엔드포인트 (AZ 장애 시 동적 전환용)"
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-rds-writer-endpoint"
+    Name = "${var.environment}-rds-writer-endpoint"
   }
 }
 
