@@ -31,8 +31,10 @@ jobs:
 
       - name: Terraform Init
         working-directory: environments/${{ matrix.environment }}
-        run: terraform init
+        run: terraform init -input=false
 
+      # -input=false: 값이 없는 변수가 있어도 대화형 입력을 요구하지 않고
+      # 즉시 실패한다. (비대화형 CI 에서 프롬프트로 멈추는 것을 원천 차단)
       - name: Terraform Plan
         working-directory: environments/${{ matrix.environment }}
-        run: terraform plan -no-color -lock-timeout=5m
+        run: terraform plan -no-color -lock-timeout=5m -input=false
