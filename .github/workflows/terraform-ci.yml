@@ -35,4 +35,4 @@ jobs:
 
       - name: Terraform Plan
         working-directory: environments/${{ matrix.environment }}
-        run: terraform plan -no-color
+        run: terraform plan -no-color -lock-timeout=5m
