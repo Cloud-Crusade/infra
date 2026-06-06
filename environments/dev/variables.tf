@@ -127,10 +127,9 @@ variable "db_allocated_storage" {
   default     = 20
 }
 
+# ===== Public 버킷 =====
 
-variable "private_key_pem" {
-  description = "JWT 서명용 Private Key (PEM)"
+variable "public_bucket" {
+  description = "공개 접근 S3 버킷 이름 (client 정적 호스팅·공개 리소스·JWT 공개키 등, state 버킷과 분리)"
   type        = string
-  sensitive   = true
-  default     = ""
 }
