@@ -126,3 +126,10 @@ variable "db_allocated_storage" {
   type        = number
   default     = 20
 }
+
+# ===== JWT 공개키 =====
+
+variable "public_key_bucket" {
+  description = "JWT 공개키 저장용 S3 버킷 이름 (state 버킷과 분리·비공개, aws_s3_object.bucket 에 사용)"
+  type        = string
+}
