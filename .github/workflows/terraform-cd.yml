@@ -1,18 +1,26 @@
-name: Terraform Apply
+name: Terraform Apply / Destroy
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 대상 환경
+        type: choice
+        options:
+          - dev
+          - prod
+      action:
+        description: 실행 작업
+        type: choice
+        options:
+          - apply
+          - destroy
 
 jobs:
-  terraform-apply:
-    name: Terraform Apply (${{ matrix.environment }})
+  terraform:
+    name: Terraform ${{ inputs.action }} (${{ inputs.environment }})
     runs-on: ubuntu-latest
-    environment: ${{ matrix.environment }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        environment: [dev, prod]
+    environment: ${{ inputs.environment }}
 
     steps:
       - name: Checkout
@@ -42,9 +50,10 @@ jobs:
           printf '%s' "$VARS_CONTEXT" | to_tfvars >> "$GITHUB_ENV"
 
       - name: Terraform Init
-        working-directory: environments/${{ matrix.environment }}
+        working-directory: environments/${{ inputs.environment }}
         run: terraform init -input=false
 
-      - name: Terraform Apply
-        working-directory: environments/${{ matrix.environment }}
-        run: terraform apply -auto-approve -input=false -lock-timeout=5m
+      # apply | destroy — 선택 환경의 배포 state(<env>/terraform.tfstate) 대상
+      - name: Terraform ${{ inputs.action }}
+        working-directory: environments/${{ inputs.environment }}
+        run: terraform ${{ inputs.action }} -auto-approve -input=false -lock-timeout=5m
