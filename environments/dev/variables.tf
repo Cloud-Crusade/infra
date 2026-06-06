@@ -1,3 +1,5 @@
+# ===== 공통 =====
+
 variable "aws_region" {
   description = "AWS 리전"
   type        = string
@@ -20,6 +22,8 @@ variable "project_name" {
   type        = string
   default     = "ktcloud-cc-infra"
 }
+
+# ===== VPC =====
 
 variable "vpc_cidr" {
   description = "VPC CIDR 블록"
@@ -47,6 +51,15 @@ variable "enable_nat_gateway" {
   default     = false
 }
 
+# ===== Security Group =====
+
+variable "allowed_ssh_cidrs" {
+  description = "Bastion host SSH 접근 허용 IP 목록"
+  type        = list(string)
+}
+
+# ===== Bastion =====
+
 variable "bastion_ami" {
   description = "Bastion Host AMI"
   type        = string
@@ -63,10 +76,7 @@ variable "bastion_key_name" {
   type        = string
 }
 
-variable "allowed_ssh_cidrs" {
-  description = "Bastion host SSH 접근 허용 IP 목록"
-  type        = list(string)
-}
+# ===== IAM =====
 
 variable "oidc_provider_arn" {
   description = "EKS OIDC Provider ARN"
@@ -78,6 +88,14 @@ variable "oidc_provider_url" {
   description = "EKS OIDC Provider URL"
   type        = string
   default     = ""
+}
+
+# ===== RDS =====
+
+variable "db_name" {
+  description = "RDS 데이터베이스 이름"
+  type        = string
+  default     = "ccdb"
 }
 
 variable "db_username" {
@@ -95,12 +113,6 @@ variable "db_engine_version" {
   description = "RDS 엔진 버전"
   type        = string
   default     = "13.18"
-}
-
-variable "db_name" {
-  description = "RDS 데이터베이스 이름"
-  type        = string
-  default     = "ccdb"
 }
 
 variable "db_instance_class" {
