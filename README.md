@@ -59,7 +59,7 @@ EX
 ### Naming
 
 **Variable**
-변수는 snake_case로 작성
+변수는 대문자 SNAKE_CASE(UPPER_SNAKE_CASE)로 작성
 
 기본 작성 규칙
 - 각 변수는 사용처, 알고리즘, 아키텍처에 맞는 명칭 사용
