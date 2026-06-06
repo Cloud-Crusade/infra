@@ -29,8 +29,14 @@ variable "rds_password" {
   default     = ""
 }
 
-variable "rds_writer_endpoint" {
-  description = "RDS Writer 엔드포인트 주소"
+variable "core_writer_endpoint" {
+  description = "메인(core) RDS Writer 엔드포인트 주소"
+  type        = string
+  default     = ""
+}
+
+variable "reservation_writer_endpoint" {
+  description = "예약(reservation) RDS Writer 엔드포인트 주소"
   type        = string
   default     = ""
 }

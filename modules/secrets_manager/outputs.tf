@@ -8,7 +8,12 @@ output "rds_credentials_secret_arn" {
   value       = aws_secretsmanager_secret.rds_credentials.arn
 }
 
-output "rds_writer_endpoint_secret_arn" {
-  description = "RDS Writer 엔드포인트 시크릿 ARN"
-  value       = aws_secretsmanager_secret.rds_writer_endpoint.arn
+output "core_rds_writer_endpoint_secret_arn" {
+  description = "메인(core) RDS Writer 엔드포인트 시크릿 ARN"
+  value       = aws_secretsmanager_secret.core_rds_writer_endpoint.arn
+}
+
+output "reservation_rds_writer_endpoint_secret_arn" {
+  description = "예약(reservation) RDS Writer 엔드포인트 시크릿 ARN"
+  value       = aws_secretsmanager_secret.reservation_rds_writer_endpoint.arn
 }

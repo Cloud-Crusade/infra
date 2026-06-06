@@ -51,18 +51,32 @@ resource "aws_secretsmanager_secret_version" "rds_credentials" {
   })
 }
 
-# RDS Writer 엔드포인트 시크릿
+# RDS Writer 엔드포인트 시크릿 (메인 DB + 예약 DB 각각)
 # AZ 장애 시 동적 전환을 위한 Writer 엔드포인트
-resource "aws_secretsmanager_secret" "rds_writer_endpoint" {
-  name        = "${var.environment}-rds-writer-endpoint"
-  description = "RDS Writer 엔드포인트 (AZ 장애 시 동적 전환용)"
+resource "aws_secretsmanager_secret" "core_rds_writer_endpoint" {
+  name        = "${var.environment}-core-rds-writer-endpoint"
+  description = "메인(core) RDS Writer 엔드포인트 (AZ 장애 시 동적 전환용)"
 
   tags = {
-    Name = "${var.environment}-rds-writer-endpoint"
+    Name = "${var.environment}-core-rds-writer-endpoint"
   }
 }
 
-resource "aws_secretsmanager_secret_version" "rds_writer_endpoint" {
-  secret_id     = aws_secretsmanager_secret.rds_writer_endpoint.id
-  secret_string = var.rds_writer_endpoint
+resource "aws_secretsmanager_secret_version" "core_rds_writer_endpoint" {
+  secret_id     = aws_secretsmanager_secret.core_rds_writer_endpoint.id
+  secret_string = var.core_writer_endpoint
+}
+
+resource "aws_secretsmanager_secret" "reservation_rds_writer_endpoint" {
+  name        = "${var.environment}-reservation-rds-writer-endpoint"
+  description = "예약(reservation) RDS Writer 엔드포인트 (AZ 장애 시 동적 전환용)"
+
+  tags = {
+    Name = "${var.environment}-reservation-rds-writer-endpoint"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "reservation_rds_writer_endpoint" {
+  secret_id     = aws_secretsmanager_secret.reservation_rds_writer_endpoint.id
+  secret_string = var.reservation_writer_endpoint
 }

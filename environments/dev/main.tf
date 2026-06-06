@@ -46,12 +46,13 @@ module "security_groups" {
 module "secrets_manager" {
   source = "../../modules/secrets_manager"
 
-  project_name        = var.project_name
-  environment         = var.environment
-  private_key_value   = var.private_key_value
-  rds_username        = var.db_username
-  rds_password        = var.db_password
-  rds_writer_endpoint = module.rds.writer_endpoint
+  project_name                = var.project_name
+  environment                 = var.environment
+  private_key_value           = tls_private_key.jwt.private_key_pem
+  rds_username                = var.db_username
+  rds_password                = var.db_password
+  core_writer_endpoint        = module.rds.primary_endpoint
+  reservation_writer_endpoint = module.rds.reservation_endpoint
 }
 
 module "iam" {
