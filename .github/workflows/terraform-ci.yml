@@ -10,6 +10,10 @@ jobs:
     name: Terraform Plan (${{ matrix.environment }})
     runs-on: ubuntu-latest
 
+    # matrix 값(dev/prod)에 해당하는 GitHub Environment 에 바인딩 →
+    # 환경 스코프 secrets/variables(예: dev 의 DB_PASSWORD)가 secrets 컨텍스트에 주입됨
+    environment: ${{ matrix.environment }}
+
     strategy:
       fail-fast: false
       matrix:
