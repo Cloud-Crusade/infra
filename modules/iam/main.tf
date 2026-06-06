@@ -218,10 +218,10 @@ resource "aws_iam_role_policy_attachment" "lambda_secrets" {
 }
 
 # IRSA 롤 연결
-resource "aws_iam_role_policy_attachment" "vpc_cni_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = aws_iam_role.vpc_cni.name
-}
+# resource "aws_iam_role_policy_attachment" "vpc_cni_policy" {
+#   policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+#   role       = aws_iam_role.vpc_cni.name
+# }
 
 resource "aws_iam_role_policy_attachment" "ebs_csi_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
