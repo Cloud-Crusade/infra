@@ -3,6 +3,11 @@ variable "project_name" {
   type        = string
 }
 
+variable "environment" {
+  description = "배포 환경 (리소스 네이밍에 포함 — dev/prod 충돌 방지)"
+  type        = string
+}
+
 variable "db_name" {
   description = "RDS 데이터베이스 이름"
   type        = string

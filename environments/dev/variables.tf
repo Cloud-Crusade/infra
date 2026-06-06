@@ -104,7 +104,7 @@ variable "db_username" {
 }
 
 variable "db_password" {
-  description = "RDS 마스터 비밀번호 (평문 tfvars 금지 — TF_VAR_db_password 로 주입)"
+  description = "RDS 마스터 비밀번호 (평문 tfvars 금지 — CI 는 Secret DB_PASSWORD, 로컬은 TF_VAR_db_password)"
   type        = string
   sensitive   = true
 }

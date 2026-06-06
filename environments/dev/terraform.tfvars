@@ -17,4 +17,6 @@ oidc_provider_arn = ""
 oidc_provider_url = ""
 
 db_username = "ccadmin"
-# db_password 는 민감값 → tfvars 평문 금지. TF_VAR_db_password 로 주입
+# db_password 는 민감값 → tfvars 평문 금지.
+# CI: GitHub Secret 이름을 DB_PASSWORD 로 (컨버터가 TF_VAR_ 접두사 + 소문자화 → TF_VAR_db_password)
+# 로컬: export TF_VAR_db_password=...
