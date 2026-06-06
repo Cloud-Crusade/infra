@@ -13,6 +13,11 @@ variable "vpc_id" {
   type        = string
 }
 
+variable "vpc_cidr" {
+  description = "VPC CIDR (RDS egress 를 VPC 내부로 한정)"
+  type        = string
+}
+
 variable "allowed_ssh_cidrs" {
   description = "Bastion host SSH 접근 허용 IP 목록"
   type        = list(string)
