@@ -46,3 +46,8 @@ variable "azs" {
   description = "RDS를 배치할 가용 영역 (반드시 리스트 타입으로 입력)"
   type        = list(string)
 }
+
+variable "subnet_ids" {
+  description = "DB 서브넷 그룹에 포함할 서브넷 ID 목록 (프라이빗)"
+  type        = list(string)
+}

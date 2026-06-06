@@ -1,5 +1,11 @@
 
-# Primary DB 
+# DB 서브넷 그룹 — 모든 RDS 인스턴스가 공유 (프라이빗 서브넷)
+resource "aws_db_subnet_group" "db_sg" {
+  name       = "${var.project_name}-db-subnet-group"
+  subnet_ids = var.subnet_ids
+}
+
+# Primary DB
 resource "aws_db_instance" "primary" {
   identifier        = "${var.project_name}-primary"
   allocated_storage = var.allocated_storage
