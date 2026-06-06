@@ -31,7 +31,7 @@ resource "aws_db_instance" "primary" {
 resource "aws_db_instance" "primary_replica" {
   identifier          = "${var.project_name}-primary-replica"
   instance_class      = var.instance_class
-  replicate_source_db = aws_db_instance.primary.id
+  replicate_source_db = aws_db_instance.primary.arn
 
   availability_zone = var.azs[0]
 
@@ -70,7 +70,7 @@ resource "aws_db_instance" "reservation" {
 resource "aws_db_instance" "reservation_replica" {
   identifier          = "${var.project_name}-reservation-replica"
   instance_class      = var.instance_class
-  replicate_source_db = aws_db_instance.reservation.id
+  replicate_source_db = aws_db_instance.reservation.arn
 
   availability_zone = var.azs[1]
 
@@ -86,7 +86,7 @@ resource "aws_db_instance" "reservation_replica" {
 resource "aws_db_instance" "reservation_replica_2" {
   identifier          = "${var.project_name}-reservation-replica-2"
   instance_class      = var.instance_class
-  replicate_source_db = aws_db_instance.reservation.id
+  replicate_source_db = aws_db_instance.reservation.arn
 
   availability_zone = var.azs[1]
 
