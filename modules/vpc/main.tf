@@ -1,10 +1,10 @@
 resource "aws_vpc" "this" {
-  cidr_block           = var.vpc_cidr
+  cidr_block           = var.VPC_CIDR
   enable_dns_support   = true
   enable_dns_hostnames = true
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-vpc"
+    Name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-vpc"
   }
 }
 
@@ -12,33 +12,33 @@ resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-igw"
+    Name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-igw"
   }
 }
 
 resource "aws_subnet" "public" {
-  count = length(var.public_subnet_cidrs)
+  count = length(var.PUBLIC_SUBNET_CIDRS)
 
   vpc_id                  = aws_vpc.this.id
-  cidr_block              = var.public_subnet_cidrs[count.index]
-  availability_zone       = var.availability_zones[count.index]
+  cidr_block              = var.PUBLIC_SUBNET_CIDRS[count.index]
+  availability_zone       = var.AVAILABILITY_ZONES[count.index]
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-public-${count.index + 1}"
+    Name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-public-${count.index + 1}"
     Type = "public"
   }
 }
 
 resource "aws_subnet" "private" {
-  count = length(var.private_subnet_cidrs)
+  count = length(var.PRIVATE_SUBNET_CIDRS)
 
   vpc_id            = aws_vpc.this.id
-  cidr_block        = var.private_subnet_cidrs[count.index]
-  availability_zone = var.availability_zones[count.index]
+  cidr_block        = var.PRIVATE_SUBNET_CIDRS[count.index]
+  availability_zone = var.AVAILABILITY_ZONES[count.index]
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-private-${count.index + 1}"
+    Name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-private-${count.index + 1}"
     Type = "private"
   }
 }
@@ -52,12 +52,12 @@ resource "aws_route_table" "public" {
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-public-rt"
+    Name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-public-rt"
   }
 }
 
 resource "aws_route_table" "private" {
-  count  = var.enable_nat_gateway ? length(var.private_subnet_cidrs) : 0
+  count  = var.ENABLE_NAT_GATEWAY ? length(var.PRIVATE_SUBNET_CIDRS) : 0
   vpc_id = aws_vpc.this.id
 
   route {
@@ -66,7 +66,7 @@ resource "aws_route_table" "private" {
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-private-rt"
+    Name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-private-rt"
   }
 }
 
@@ -78,7 +78,7 @@ resource "aws_route_table_association" "public" {
 }
 
 resource "aws_route_table_association" "private" {
-  count = var.enable_nat_gateway ? length(var.private_subnet_cidrs) : 0
+  count = var.ENABLE_NAT_GATEWAY ? length(var.PRIVATE_SUBNET_CIDRS) : 0
 
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[count.index].id

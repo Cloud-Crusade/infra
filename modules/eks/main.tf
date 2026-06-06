@@ -1,12 +1,12 @@
 resource "aws_eks_cluster" "this" {
-  name     = "${var.project_name}-${var.environment}-eks"
+  name     = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-eks"
   role_arn = aws_iam_role.cluster.arn
-  version  = var.cluster_version
+  version  = var.CLUSTER_VERSION
 
   vpc_config {
-    subnet_ids              = var.subnet_ids
+    subnet_ids              = var.SUBNET_IDS
     endpoint_private_access = true
-    endpoint_public_access  = var.endpoint_public_access
+    endpoint_public_access  = var.ENDPOINT_PUBLIC_ACCESS
   }
 
   depends_on = [
@@ -14,12 +14,12 @@ resource "aws_eks_cluster" "this" {
   ]
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-eks"
+    Name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-eks"
   }
 }
 
 resource "aws_iam_role" "cluster" {
-  name = "${var.project_name}-${var.environment}-eks-cluster-role"
+  name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-eks-cluster-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -40,15 +40,15 @@ resource "aws_iam_role_policy_attachment" "cluster_policy" {
 
 resource "aws_eks_node_group" "this" {
   cluster_name    = aws_eks_cluster.this.name
-  node_group_name = "${var.project_name}-${var.environment}-node-group"
+  node_group_name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-node-group"
   node_role_arn   = aws_iam_role.node.arn
-  subnet_ids      = var.subnet_ids
-  instance_types  = var.node_instance_types
+  subnet_ids      = var.SUBNET_IDS
+  instance_types  = var.NODE_INSTANCE_TYPES
 
   scaling_config {
-    desired_size = var.node_desired_size
-    min_size     = var.node_min_size
-    max_size     = var.node_max_size
+    desired_size = var.NODE_DESIRED_SIZE
+    min_size     = var.NODE_MIN_SIZE
+    max_size     = var.NODE_MAX_SIZE
   }
 
   depends_on = [
@@ -58,12 +58,12 @@ resource "aws_eks_node_group" "this" {
   ]
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-node-group"
+    Name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-node-group"
   }
 }
 
 resource "aws_iam_role" "node" {
-  name = "${var.project_name}-${var.environment}-eks-node-role"
+  name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-eks-node-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

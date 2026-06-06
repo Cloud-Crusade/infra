@@ -5,7 +5,7 @@
 # EKS 클러스터 롤
 # EKS 서비스가 AWS 리소스를 제어할 수 있도록 권한을 부여
 resource "aws_iam_role" "eks_cluster" {
-  name = "${var.project_name}-eks-cluster-role"
+  name = "${var.PROJECT_NAME}-eks-cluster-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -24,7 +24,7 @@ resource "aws_iam_role" "eks_cluster" {
 # EKS 노드 롤
 # 실제 워크로드를 실행하는 노드(EC2)에 부여하는 역할
 resource "aws_iam_role" "eks_node" {
-  name = "${var.project_name}-eks-node-role"
+  name = "${var.PROJECT_NAME}-eks-node-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -43,7 +43,7 @@ resource "aws_iam_role" "eks_node" {
 # Lambda 롤
 # Lambda 함수 실행에 필요한 최소 권한만 부여
 resource "aws_iam_role" "lambda" {
-  name = "${var.project_name}-lambda-role"
+  name = "${var.PROJECT_NAME}-lambda-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -63,7 +63,7 @@ resource "aws_iam_role" "lambda" {
 # kube-system/aws-node 파드에 직접 CNI 권한 부여
 # TODO: EKS 담당자에게 oidc_provider_arn, oidc_provider_url 받은 후 완성
 resource "aws_iam_role" "vpc_cni" {
-  name = "${var.project_name}-vpc-cni-role"
+  name = "${var.PROJECT_NAME}-vpc-cni-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -71,12 +71,12 @@ resource "aws_iam_role" "vpc_cni" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = var.oidc_provider_arn
+          Federated = var.OIDC_PROVIDER_ARN
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${var.oidc_provider_url}:sub" = "system:serviceaccount:kube-system:aws-node"
+            "${var.OIDC_PROVIDER_URL}:sub" = "system:serviceaccount:kube-system:aws-node"
           }
         }
       }
@@ -88,7 +88,7 @@ resource "aws_iam_role" "vpc_cni" {
 # kube-system/ebs-csi-controller-sa 파드에 직접 EBS 권한 부여
 # TODO: EKS 담당자에게 oidc_provider_arn, oidc_provider_url 받은 후 완성
 resource "aws_iam_role" "ebs_csi" {
-  name = "${var.project_name}-ebs-csi-role"
+  name = "${var.PROJECT_NAME}-ebs-csi-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -96,12 +96,12 @@ resource "aws_iam_role" "ebs_csi" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = var.oidc_provider_arn
+          Federated = var.OIDC_PROVIDER_ARN
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${var.oidc_provider_url}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+            "${var.OIDC_PROVIDER_URL}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
           }
         }
       }
@@ -115,7 +115,7 @@ resource "aws_iam_role" "ebs_csi" {
 
 # CloudWatch 로그 쓰기 권한
 resource "aws_iam_policy" "lambda_logging" {
-  name        = "${var.project_name}-lambda-logging-policy"
+  name        = "${var.PROJECT_NAME}-lambda-logging-policy"
   description = "Lambda minimum policy for CloudWatch logging"
 
   policy = jsonencode({
@@ -136,7 +136,7 @@ resource "aws_iam_policy" "lambda_logging" {
 
 # Secrets Manager 읽기 권한
 resource "aws_iam_policy" "lambda_secrets" {
-  name        = "${var.project_name}-lambda-secrets-policy"
+  name        = "${var.PROJECT_NAME}-lambda-secrets-policy"
   description = "Lambda minimum policy for Secrets Manager read"
 
   policy = jsonencode({
@@ -156,7 +156,7 @@ resource "aws_iam_policy" "lambda_secrets" {
 
 # ElastiCache 접근 권한
 resource "aws_iam_policy" "eks_elasticache" {
-  name        = "${var.project_name}-eks-elasticache-policy"
+  name        = "${var.PROJECT_NAME}-eks-elasticache-policy"
   description = "EKS node minimum policy for ElastiCache access"
 
   policy = jsonencode({

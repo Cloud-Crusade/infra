@@ -1,14 +1,14 @@
 output "aws_region" {
   description = "배포된 AWS 리전"
-  value       = var.aws_region
+  value       = var.AWS_REGION
 }
 
 output "environment" {
   description = "현재 배포 환경"
-  value       = var.environment
+  value       = var.ENVIRONMENT
 }
 
 output "project_name" {
   description = "프로젝트 이름"
-  value       = var.project_name
+  value       = var.PROJECT_NAME
 }

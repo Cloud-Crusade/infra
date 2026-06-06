@@ -1,20 +1,20 @@
-aws_region   = "ap-northeast-2"
-environment  = "dev"
-project_name = "cc"
+AWS_REGION   = "ap-northeast-2"
+ENVIRONMENT  = "dev"
+PROJECT_NAME = "cc"
 
-vpc_cidr             = "10.0.0.0/16"
-public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
-private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24"]
-availability_zones   = ["ap-northeast-2a", "ap-northeast-2c"]
+VPC_CIDR             = "10.0.0.0/16"
+PUBLIC_SUBNET_CIDRS  = ["10.0.1.0/24", "10.0.2.0/24"]
+PRIVATE_SUBNET_CIDRS = ["10.0.11.0/24", "10.0.12.0/24"]
+AVAILABILITY_ZONES   = ["ap-northeast-2a", "ap-northeast-2c"]
 
-bastion_ami           = "ami-0a10b2721688ce9d2" # KT Cloud AMI ID
-bastion_instance_type = "t3.micro"
-bastion_key_name      = "bastion-key"
+BASTION_AMI           = "ami-0a10b2721688ce9d2" # KT Cloud AMI ID
+BASTION_INSTANCE_TYPE = "t3.micro"
+BASTION_KEY_NAME      = "bastion-key"
 
-allowed_ssh_cidrs = ["0.0.0.0/0"]
+ALLOWED_SSH_CIDRS = ["0.0.0.0/0"]
 
-oidc_provider_arn = ""
-oidc_provider_url = ""
+OIDC_PROVIDER_ARN = ""
+OIDC_PROVIDER_URL = ""
 
-db_username = "ccadmin"
-# db_password 는 민감값 → tfvars 평문 금지. TF_VAR_db_password 로 주입
+DB_USERNAME = "ccadmin"
+# DB_PASSWORD 는 민감값 → tfvars 평문 금지. TF_VAR_DB_PASSWORD 로 주입

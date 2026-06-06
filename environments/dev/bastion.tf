@@ -4,7 +4,7 @@ resource "tls_private_key" "bastion" {
 }
 
 resource "aws_key_pair" "bastion" {
-  key_name   = "${var.project_name}-${var.environment}-bastion-key"
+  key_name   = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-bastion-key"
   public_key = tls_private_key.bastion.public_key_openssh
 }
 
@@ -15,14 +15,14 @@ resource "local_file" "bastion_private_key" {
 }
 
 resource "aws_instance" "bastion" {
-  ami                         = var.bastion_ami
-  instance_type               = var.bastion_instance_type
+  ami                         = var.BASTION_AMI
+  instance_type               = var.BASTION_INSTANCE_TYPE
   subnet_id                   = module.vpc.public_subnet_ids[0]
   vpc_security_group_ids      = [module.security_groups.bastion_sg_id]
   key_name                    = aws_key_pair.bastion.key_name
   associate_public_ip_address = true
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-bastion"
+    Name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-bastion"
   }
 }

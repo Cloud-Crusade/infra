@@ -1,13 +1,13 @@
 resource "aws_security_group" "bastion" {
-  name        = "${var.project_name}-${var.environment}-bastion-sg"
+  name        = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-bastion-sg"
   description = "Security Group for Bastion host"
-  vpc_id      = var.vpc_id
+  vpc_id      = var.VPC_ID
 
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = var.allowed_ssh_cidrs
+    cidr_blocks = var.ALLOWED_SSH_CIDRS
   }
 
   egress {
@@ -18,14 +18,14 @@ resource "aws_security_group" "bastion" {
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-bastion-sg"
+    Name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-bastion-sg"
   }
 }
 
 resource "aws_security_group" "rds" {
-  name        = "${var.project_name}-${var.environment}-rds-sg"
+  name        = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-rds-sg"
   description = "Security Group for RDS instances"
-  vpc_id      = var.vpc_id
+  vpc_id      = var.VPC_ID
 
   ingress {
     from_port       = 5432
@@ -42,14 +42,14 @@ resource "aws_security_group" "rds" {
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-rds-sg"
+    Name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-rds-sg"
   }
 }
 
 resource "aws_security_group" "eks" {
-  name        = "${var.project_name}-${var.environment}-eks-sg"
+  name        = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-eks-sg"
   description = "Security Group for EKS"
-  vpc_id      = var.vpc_id
+  vpc_id      = var.VPC_ID
 
   ingress {
     from_port       = 6443
@@ -66,6 +66,6 @@ resource "aws_security_group" "eks" {
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-eks-sg"
+    Name = "${var.PROJECT_NAME}-${var.ENVIRONMENT}-eks-sg"
   }
 }
