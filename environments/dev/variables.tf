@@ -90,3 +90,9 @@ variable "db_password" {
   type        = string
   sensitive   = true
 }
+
+variable "engine_version" {
+  description = "RDS 엔진 버전"
+  type        = string
+  default     = "13.18"
+}
