@@ -1,0 +1,45 @@
+name: Terraform Apply (dev)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  terraform-apply:
+    name: Terraform Apply (dev)
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      # GitHub secrets/variables → TF_VAR_<소문자키> 매핑 (terraform 변수 주입)
+      - name: Map secrets/variables to TF_VAR_
+        env:
+          SECRETS_CONTEXT: ${{ toJSON(secrets) }}
+          VARS_CONTEXT: ${{ toJSON(vars) }}
+        run: |
+          to_tfvars() {
+            jq -r 'to_entries[]
+              | "TF_VAR_\(.key | ascii_downcase)<<__TFVAR_EOF__\n\(.value)\n__TFVAR_EOF__"'
+          }
+          printf '%s' "$SECRETS_CONTEXT" | to_tfvars >> "$GITHUB_ENV"
+          printf '%s' "$VARS_CONTEXT" | to_tfvars >> "$GITHUB_ENV"
+
+      - name: Terraform Init
+        working-directory: environments/dev
+        run: terraform init -input=false
+
+      - name: Terraform Apply
+        working-directory: environments/dev
+        run: terraform apply -auto-approve -input=false -lock-timeout=5m
