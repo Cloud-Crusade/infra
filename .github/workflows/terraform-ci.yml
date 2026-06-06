@@ -31,8 +31,8 @@ jobs:
 
       - name: Terraform Init
         working-directory: environments/${{ matrix.environment }}
-        run: terraform init
+        run: terraform init -input=false
 
       - name: Terraform Plan
         working-directory: environments/${{ matrix.environment }}
-        run: terraform plan -no-color -lock-timeout=5m
+        run: terraform plan -no-color -lock-timeout=5m -input=false
