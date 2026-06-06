@@ -3,18 +3,32 @@
 # ==============================
 
 # Private Key 시크릿
-# Lambda가 JWT 토큰 서명 시 사용하는 비공개 키
-resource "aws_secretsmanager_secret" "private_key" {
-  name        = "${var.environment}-private-key"
+resource "aws_secretsmanager_secret" "authorization_private_key" {
+  name        = "${var.environment}-authorization-private-key"
   description = "JWT 서명용 Private Key"
 
   tags = {
-    Name = "${var.environment}-private-key"
+    Name = "${var.environment}-authorization-private-key"
   }
 }
 
-resource "aws_secretsmanager_secret_version" "private_key" {
-  secret_id     = aws_secretsmanager_secret.private_key.id
+resource "aws_secretsmanager_secret_version" "authorization_private_key" {
+  secret_id     = aws_secretsmanager_secret.authorization_private_key.id
+  secret_string = var.private_key_value
+}
+
+# Lambda가 JWT 토큰 서명 시 사용하는 비공개 키
+resource "aws_secretsmanager_secret" "reservation_private_key" {
+  name        = "${var.environment}-reservation-private-key"
+  description = "JWT 서명용 Private Key"
+
+  tags = {
+    Name = "${var.environment}-reservation-private-key"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "reservation_private_key" {
+  secret_id     = aws_secretsmanager_secret.reservation_private_key.id
   secret_string = var.private_key_value
 }
 
