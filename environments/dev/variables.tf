@@ -126,3 +126,11 @@ variable "db_allocated_storage" {
   type        = number
   default     = 20
 }
+
+
+variable "private_key_pem" {
+  description = "JWT 서명용 Private Key (PEM)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
