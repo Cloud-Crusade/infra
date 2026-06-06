@@ -87,27 +87,27 @@ resource "aws_iam_role" "lambda" {
 # ebs_csi 롤 (IRSA)
 # kube-system/ebs-csi-controller-sa 파드에 직접 EBS 권한 부여
 # TODO: EKS 담당자에게 oidc_provider_arn, oidc_provider_url 받은 후 완성
-resource "aws_iam_role" "ebs_csi" {
-  name = "${var.project_name}-ebs-csi-role"
+# resource "aws_iam_role" "ebs_csi" {
+#   name = "${var.project_name}-ebs-csi-role"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Federated = var.oidc_provider_arn
-        }
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Condition = {
-          StringEquals = {
-            "${var.oidc_provider_url}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
-          }
-        }
-      }
-    ]
-  })
-}
+#   assume_role_policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [
+#       {
+#         Effect = "Allow"
+#         Principal = {
+#           Federated = var.oidc_provider_arn
+#         }
+#         Action = "sts:AssumeRoleWithWebIdentity"
+#         Condition = {
+#           StringEquals = {
+#             "${var.oidc_provider_url}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+#           }
+#         }
+#       }
+#     ]
+#   })
+# }
 
 # ==============================
 # 정책 정의 (aws_iam_policy)
@@ -223,7 +223,7 @@ resource "aws_iam_role_policy_attachment" "lambda_secrets" {
 #   role       = aws_iam_role.vpc_cni.name
 # }
 
-resource "aws_iam_role_policy_attachment" "ebs_csi_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
-  role       = aws_iam_role.ebs_csi.name
-}
+# resource "aws_iam_role_policy_attachment" "ebs_csi_policy" {
+#   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+#   role       = aws_iam_role.ebs_csi.name
+# }
