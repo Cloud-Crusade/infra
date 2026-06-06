@@ -9,6 +9,7 @@ jobs:
   terraform-plan:
     name: Terraform Plan (${{ matrix.environment }})
     runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
 
     strategy:
       fail-fast: false
