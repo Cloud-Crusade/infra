@@ -128,8 +128,8 @@ variable "db_allocated_storage" {
 }
 
 
-variable "private_key_value" {
-  description = "JWT 서명용 Private Key 값"
+variable "private_key_pem" {
+  description = "JWT 서명용 Private Key (PEM)"
   type        = string
   sensitive   = true
   default     = ""
