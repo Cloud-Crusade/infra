@@ -59,7 +59,7 @@ module "rds" {
   db_name                = "ccdb"
   db_username            = var.db_username
   db_password            = var.db_password
-  engine_version         = var.engine_version
+  engine_version         = var.db_engine_version
   vpc_security_group_ids = [module.security_groups.rds_sg_id]
   azs                    = var.availability_zones
   subnet_ids             = module.vpc.private_subnet_ids
