@@ -9,6 +9,7 @@ jobs:
   terraform-plan:
     name: Terraform Plan (${{ matrix.environment }})
     runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
 
     strategy:
       fail-fast: false
@@ -28,6 +29,21 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
+
+      # GitHub secrets/variables(대문자 관례)를 terraform 변수(소문자 snake_case)로 매핑.
+      # 키를 소문자화 + TF_VAR_ 접두사로 $GITHUB_ENV 에 기록. 선언되지 않은 TF_VAR_* 는 terraform 이 무시.
+      - name: Map secrets/variables to TF_VAR_
+        env:
+          SECRETS_CONTEXT: ${{ toJSON(secrets) }}
+          VARS_CONTEXT: ${{ toJSON(vars) }}
+        run: |
+          to_tfvars() {
+            # 값은 heredoc 으로 기록(멀티라인/특수문자 안전), 값 자체는 로그에 노출되지 않음
+            jq -r 'to_entries[]
+              | "TF_VAR_\(.key | ascii_downcase)<<__TFVAR_EOF__\n\(.value)\n__TFVAR_EOF__"'
+          }
+          printf '%s' "$SECRETS_CONTEXT" | to_tfvars >> "$GITHUB_ENV"
+          printf '%s' "$VARS_CONTEXT" | to_tfvars >> "$GITHUB_ENV"
 
       - name: Terraform Init
         working-directory: environments/${{ matrix.environment }}

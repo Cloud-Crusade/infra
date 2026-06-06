@@ -39,6 +39,7 @@ module "security_groups" {
   project_name      = var.project_name
   environment       = var.environment
   vpc_id            = module.vpc.vpc_id
+  vpc_cidr          = var.vpc_cidr
   allowed_ssh_cidrs = var.allowed_ssh_cidrs
 }
 
@@ -51,4 +52,29 @@ module "secrets_manager" {
   rds_username        = var.rds_username
   rds_password        = var.rds_password
   rds_writer_endpoint = var.rds_writer_endpoint
+}
+
+module "iam" {
+  source = "../../modules/iam"
+
+  project_name      = var.project_name
+  environment       = var.environment
+  oidc_provider_arn = var.oidc_provider_arn
+  oidc_provider_url = var.oidc_provider_url
+}
+
+module "rds" {
+  source = "../../modules/rds"
+
+  project_name           = var.project_name
+  environment            = var.environment
+  db_name                = var.db_name
+  db_username            = var.db_username
+  db_password            = var.db_password
+  instance_class         = var.db_instance_class
+  engine_version         = var.db_engine_version
+  allocated_storage      = var.db_allocated_storage
+  vpc_security_group_ids = [module.security_groups.rds_sg_id]
+  azs                    = var.availability_zones
+  subnet_ids             = module.vpc.private_subnet_ids
 }

@@ -3,6 +3,11 @@ variable "project_name" {
   type        = string
 }
 
+variable "environment" {
+  description = "배포 환경 (리소스 네이밍에 포함 — dev/prod 충돌 방지)"
+  type        = string
+}
+
 variable "db_name" {
   description = "RDS 데이터베이스 이름"
   type        = string
@@ -44,5 +49,10 @@ variable "vpc_security_group_ids" {
 
 variable "azs" {
   description = "RDS를 배치할 가용 영역 (반드시 리스트 타입으로 입력)"
+  type        = list(string)
+}
+
+variable "subnet_ids" {
+  description = "DB 서브넷 그룹에 포함할 서브넷 ID 목록 (프라이빗)"
   type        = list(string)
 }
