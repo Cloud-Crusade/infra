@@ -79,3 +79,14 @@ variable "oidc_provider_url" {
   type        = string
   default     = ""
 }
+
+variable "db_username" {
+  description = "RDS 마스터 사용자 이름"
+  type        = string
+}
+
+variable "db_password" {
+  description = "RDS 마스터 비밀번호 (평문 tfvars 금지 — TF_VAR_db_password 로 주입)"
+  type        = string
+  sensitive   = true
+}

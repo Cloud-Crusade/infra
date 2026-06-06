@@ -41,3 +41,24 @@ module "security_groups" {
   vpc_id            = module.vpc.vpc_id
   allowed_ssh_cidrs = var.allowed_ssh_cidrs
 }
+
+module "iam" {
+  source = "../../modules/iam"
+
+  project_name      = var.project_name
+  environment       = var.environment
+  oidc_provider_arn = var.oidc_provider_arn
+  oidc_provider_url = var.oidc_provider_url
+}
+
+module "rds" {
+  source = "../../modules/rds"
+
+  project_name           = var.project_name
+  db_name                = "ccdb"
+  db_username            = var.db_username
+  db_password            = var.db_password
+  vpc_security_group_ids = [module.security_groups.rds_sg_id]
+  azs                    = var.availability_zones
+  subnet_ids             = module.vpc.private_subnet_ids
+}
