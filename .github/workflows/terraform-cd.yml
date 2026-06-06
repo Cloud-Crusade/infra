@@ -1,13 +1,18 @@
-name: Terraform Apply (dev)
+name: Terraform Apply
 
 on:
   workflow_dispatch:
 
 jobs:
   terraform-apply:
-    name: Terraform Apply (dev)
+    name: Terraform Apply (${{ matrix.environment }})
     runs-on: ubuntu-latest
-    environment: dev
+    environment: ${{ matrix.environment }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prod]
 
     steps:
       - name: Checkout
@@ -37,9 +42,9 @@ jobs:
           printf '%s' "$VARS_CONTEXT" | to_tfvars >> "$GITHUB_ENV"
 
       - name: Terraform Init
-        working-directory: environments/dev
+        working-directory: environments/${{ matrix.environment }}
         run: terraform init -input=false
 
       - name: Terraform Apply
-        working-directory: environments/dev
+        working-directory: environments/${{ matrix.environment }}
         run: terraform apply -auto-approve -input=false -lock-timeout=5m
