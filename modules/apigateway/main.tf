@@ -2,97 +2,171 @@ locals {
   name = "${var.project_name}-${var.environment}"
 }
 
-resource "aws_apigatewayv2_api" "this" {
-  name          = "${local.name}-http-api"
-  protocol_type = "HTTP"
+resource "aws_api_gateway_rest_api" "this" {
+  name = "${local.name}-rest-api"
 }
 
-resource "aws_apigatewayv2_stage" "default" {
-  api_id      = aws_apigatewayv2_api.this.id
-  name        = "$default"
-  auto_deploy = true
+# 필수 파라미터(헤더) 검증기 — 예약 경로의 Reservation 헤더 누락을 통합 호출 전에 거부
+resource "aws_api_gateway_request_validator" "params" {
+  name                        = "${local.name}-params"
+  rest_api_id                 = aws_api_gateway_rest_api.this.id
+  validate_request_parameters = true
+  validate_request_body       = false
 }
 
-# 예약 경로 authorizer — Reservation 헤더 존재만 검사(외부 Lambda).
-# identity_sources 미지정 → 헤더가 없어도 authorizer 가 호출되어 거부(403)를 낸다(401 아님).
-resource "aws_apigatewayv2_authorizer" "reservation" {
-  api_id                            = aws_apigatewayv2_api.this.id
-  name                              = "${local.name}-reservation-authorizer"
-  authorizer_type                   = "REQUEST"
-  authorizer_uri                    = var.authorizer_lambda_invoke_arn
-  authorizer_payload_format_version = "2.0"
-  enable_simple_responses           = true
+# 필수 파라미터 누락(기본 400)을 403 으로 변경 — "Reservation 헤더 없으면 403"
+resource "aws_api_gateway_gateway_response" "missing_params" {
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  response_type = "BAD_REQUEST_PARAMETERS"
+  status_code   = "403"
 }
 
-# ===== 통합 =====
-resource "aws_apigatewayv2_integration" "queue" {
-  api_id                 = aws_apigatewayv2_api.this.id
-  integration_type       = "AWS_PROXY"
-  integration_uri        = var.queue_lambda_invoke_arn
-  payload_format_version = "2.0"
+# ===== /reservations (Reservation 헤더 필수) =====
+resource "aws_api_gateway_resource" "reservations" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_rest_api.this.root_resource_id
+  path_part   = "reservations"
 }
 
-resource "aws_apigatewayv2_integration" "reservations" {
-  api_id           = aws_apigatewayv2_api.this.id
-  integration_type = "HTTP_PROXY"
-  integration_uri  = "${var.reservation_backend_url}/reservations"
+resource "aws_api_gateway_method" "reservations" {
+  rest_api_id          = aws_api_gateway_rest_api.this.id
+  resource_id          = aws_api_gateway_resource.reservations.id
+  http_method          = "ANY"
+  authorization        = "NONE"
+  request_validator_id = aws_api_gateway_request_validator.params.id
+  request_parameters   = { "method.request.header.Reservation" = true }
 }
 
-resource "aws_apigatewayv2_integration" "reservation_item" {
-  api_id           = aws_apigatewayv2_api.this.id
-  integration_type = "HTTP_PROXY"
-  integration_uri  = "${var.reservation_backend_url}/reservations/{reservation_id}"
+resource "aws_api_gateway_integration" "reservations" {
+  rest_api_id             = aws_api_gateway_rest_api.this.id
+  resource_id             = aws_api_gateway_resource.reservations.id
+  http_method             = aws_api_gateway_method.reservations.http_method
+  type                    = "HTTP_PROXY"
+  integration_http_method = "ANY"
+  uri                     = "${var.reservation_backend_url}/reservations"
 }
 
-# 그 외 모든 경로 → app 백엔드(EKS). Authorization 인증은 EKS 가 판별.
-resource "aws_apigatewayv2_integration" "app" {
-  api_id           = aws_apigatewayv2_api.this.id
-  integration_type = "HTTP_PROXY"
-  integration_uri  = "${var.app_backend_url}/{proxy}"
+# ===== /reservations/{reservation_id} (Reservation 헤더 필수) =====
+resource "aws_api_gateway_resource" "reservation_item" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_resource.reservations.id
+  path_part   = "{reservation_id}"
 }
 
-# ===== 라우트 =====
-resource "aws_apigatewayv2_route" "queue" {
-  api_id    = aws_apigatewayv2_api.this.id
-  route_key = "ANY /queue/{event_id}"
-  target    = "integrations/${aws_apigatewayv2_integration.queue.id}"
+resource "aws_api_gateway_method" "reservation_item" {
+  rest_api_id          = aws_api_gateway_rest_api.this.id
+  resource_id          = aws_api_gateway_resource.reservation_item.id
+  http_method          = "ANY"
+  authorization        = "NONE"
+  request_validator_id = aws_api_gateway_request_validator.params.id
+  request_parameters = {
+    "method.request.header.Reservation"  = true
+    "method.request.path.reservation_id" = true
+  }
 }
 
-resource "aws_apigatewayv2_route" "reservations" {
-  api_id             = aws_apigatewayv2_api.this.id
-  route_key          = "ANY /reservations"
-  target             = "integrations/${aws_apigatewayv2_integration.reservations.id}"
-  authorization_type = "CUSTOM"
-  authorizer_id      = aws_apigatewayv2_authorizer.reservation.id
+resource "aws_api_gateway_integration" "reservation_item" {
+  rest_api_id             = aws_api_gateway_rest_api.this.id
+  resource_id             = aws_api_gateway_resource.reservation_item.id
+  http_method             = aws_api_gateway_method.reservation_item.http_method
+  type                    = "HTTP_PROXY"
+  integration_http_method = "ANY"
+  uri                     = "${var.reservation_backend_url}/reservations/{reservation_id}"
+  request_parameters = {
+    "integration.request.path.reservation_id" = "method.request.path.reservation_id"
+  }
 }
 
-resource "aws_apigatewayv2_route" "reservation_item" {
-  api_id             = aws_apigatewayv2_api.this.id
-  route_key          = "ANY /reservations/{reservation_id}"
-  target             = "integrations/${aws_apigatewayv2_integration.reservation_item.id}"
-  authorization_type = "CUSTOM"
-  authorizer_id      = aws_apigatewayv2_authorizer.reservation.id
+# ===== /queue/{event_id} → queue Lambda =====
+resource "aws_api_gateway_resource" "queue" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_rest_api.this.root_resource_id
+  path_part   = "queue"
 }
 
-resource "aws_apigatewayv2_route" "proxy" {
-  api_id    = aws_apigatewayv2_api.this.id
-  route_key = "ANY /{proxy+}"
-  target    = "integrations/${aws_apigatewayv2_integration.app.id}"
+resource "aws_api_gateway_resource" "queue_item" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_resource.queue.id
+  path_part   = "{event_id}"
 }
 
-# ===== 게이트웨이 → Lambda invoke 권한 (Lambda 자체는 외부 생성) =====
-resource "aws_lambda_permission" "authorizer" {
-  statement_id  = "AllowApiGatewayInvokeAuthorizer"
-  action        = "lambda:InvokeFunction"
-  function_name = var.authorizer_lambda_function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.this.execution_arn}/authorizers/${aws_apigatewayv2_authorizer.reservation.id}"
+resource "aws_api_gateway_method" "queue" {
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.queue_item.id
+  http_method   = "ANY"
+  authorization = "NONE"
 }
 
+resource "aws_api_gateway_integration" "queue" {
+  rest_api_id             = aws_api_gateway_rest_api.this.id
+  resource_id             = aws_api_gateway_resource.queue_item.id
+  http_method             = aws_api_gateway_method.queue.http_method
+  type                    = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri                     = var.queue_lambda_invoke_arn
+}
+
+# ===== 그 외 모든 경로(/{proxy+}) → app 백엔드(EKS). Authorization 은 EKS 가 판별 =====
+resource "aws_api_gateway_resource" "proxy" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_rest_api.this.root_resource_id
+  path_part   = "{proxy+}"
+}
+
+resource "aws_api_gateway_method" "proxy" {
+  rest_api_id        = aws_api_gateway_rest_api.this.id
+  resource_id        = aws_api_gateway_resource.proxy.id
+  http_method        = "ANY"
+  authorization      = "NONE"
+  request_parameters = { "method.request.path.proxy" = true }
+}
+
+resource "aws_api_gateway_integration" "proxy" {
+  rest_api_id             = aws_api_gateway_rest_api.this.id
+  resource_id             = aws_api_gateway_resource.proxy.id
+  http_method             = aws_api_gateway_method.proxy.http_method
+  type                    = "HTTP_PROXY"
+  integration_http_method = "ANY"
+  uri                     = "${var.app_backend_url}/{proxy}"
+  request_parameters = {
+    "integration.request.path.proxy" = "method.request.path.proxy"
+  }
+}
+
+# ===== 배포 + 스테이지 =====
+resource "aws_api_gateway_deployment" "this" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+
+  triggers = {
+    redeployment = sha1(jsonencode([
+      aws_api_gateway_method.reservations,
+      aws_api_gateway_integration.reservations,
+      aws_api_gateway_method.reservation_item,
+      aws_api_gateway_integration.reservation_item,
+      aws_api_gateway_method.queue,
+      aws_api_gateway_integration.queue,
+      aws_api_gateway_method.proxy,
+      aws_api_gateway_integration.proxy,
+      aws_api_gateway_gateway_response.missing_params,
+    ]))
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_api_gateway_stage" "this" {
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  deployment_id = aws_api_gateway_deployment.this.id
+  stage_name    = var.environment
+}
+
+# 게이트웨이 → queue Lambda invoke 권한 (Lambda 자체는 외부 생성)
 resource "aws_lambda_permission" "queue" {
   statement_id  = "AllowApiGatewayInvokeQueue"
   action        = "lambda:InvokeFunction"
   function_name = var.queue_lambda_function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.this.execution_arn}/*/*/queue/{event_id}"
+  source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/*/*/queue/*"
 }
