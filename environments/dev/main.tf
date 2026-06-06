@@ -49,9 +49,9 @@ module "secrets_manager" {
   project_name        = var.project_name
   environment         = var.environment
   private_key_value   = var.private_key_value
-  rds_username        = var.rds_username
-  rds_password        = var.rds_password
-  rds_writer_endpoint = var.rds_writer_endpoint
+  rds_username        = var.db_username
+  rds_password        = var.db_password
+  rds_writer_endpoint = module.rds.writer_endpoint
 }
 
 module "iam" {
