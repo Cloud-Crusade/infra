@@ -96,3 +96,21 @@ variable "db_engine_version" {
   type        = string
   default     = "13.18"
 }
+
+variable "db_name" {
+  description = "RDS 데이터베이스 이름"
+  type        = string
+  default     = "ccdb"
+}
+
+variable "db_instance_class" {
+  description = "RDS 인스턴스 타입"
+  type        = string
+  default     = "db.t3.micro"
+}
+
+variable "db_allocated_storage" {
+  description = "RDS 스토리지 크기 (GB)"
+  type        = number
+  default     = 20
+}
