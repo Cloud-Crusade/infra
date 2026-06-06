@@ -8,8 +8,15 @@ variable "environment" {
   type        = string
 }
 
-variable "private_key_value" {
-  description = "JWT 서명용 Private Key 값"
+variable "authorization_private_key_value" {
+  description = "authorization JWT 서명용 Private Key (PEM)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "reservation_private_key_value" {
+  description = "reservation JWT 서명용 Private Key (PEM)"
   type        = string
   sensitive   = true
   default     = ""

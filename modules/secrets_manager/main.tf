@@ -14,7 +14,7 @@ resource "aws_secretsmanager_secret" "authorization_private_key" {
 
 resource "aws_secretsmanager_secret_version" "authorization_private_key" {
   secret_id     = aws_secretsmanager_secret.authorization_private_key.id
-  secret_string = var.private_key_value
+  secret_string = var.authorization_private_key_value
 }
 
 # Lambda가 JWT 토큰 서명 시 사용하는 비공개 키
@@ -29,7 +29,7 @@ resource "aws_secretsmanager_secret" "reservation_private_key" {
 
 resource "aws_secretsmanager_secret_version" "reservation_private_key" {
   secret_id     = aws_secretsmanager_secret.reservation_private_key.id
-  secret_string = var.private_key_value
+  secret_string = var.reservation_private_key_value
 }
 
 # RDS 접속 정보 시크릿

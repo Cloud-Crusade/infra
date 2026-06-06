@@ -1,6 +1,11 @@
-output "private_key_secret_arn" {
-  description = "Private Key 시크릿 ARN"
-  value       = aws_secretsmanager_secret.private_key.arn
+output "authorization_private_key_secret_arn" {
+  description = "authorization Private Key 시크릿 ARN"
+  value       = aws_secretsmanager_secret.authorization_private_key.arn
+}
+
+output "reservation_private_key_secret_arn" {
+  description = "reservation Private Key 시크릿 ARN"
+  value       = aws_secretsmanager_secret.reservation_private_key.arn
 }
 
 output "rds_credentials_secret_arn" {
