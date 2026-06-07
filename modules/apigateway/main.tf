@@ -8,13 +8,20 @@ resource "aws_api_gateway_rest_api" "this" {
 
 # 예약 토큰(Reservation) RS256 서명 검증 Lambda authorizer
 # authorizer 람다가 S3 의 reservation 공개키로 서명 검증(공개키 위치는 authorizer 람다 env)
-# - Reservation 헤더 없음 → 401, 서명 무효 → 403, 유효 → 통과
+# - Reservation 헤더 없음 → 403, 서명 무효 → 403, 유효 → 통과
 resource "aws_api_gateway_authorizer" "reservation" {
   name            = "${local.name}-reservation-authorizer"
   rest_api_id     = aws_api_gateway_rest_api.this.id
   type            = "REQUEST"
   authorizer_uri  = var.authorizer_lambda_invoke_arn
   identity_source = "method.request.header.Reservation"
+}
+
+# Reservation 헤더 없음(identity source 누락 → 기본 401)을 403 으로 매핑
+resource "aws_api_gateway_gateway_response" "unauthorized" {
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  response_type = "UNAUTHORIZED"
+  status_code   = "403"
 }
 
 # ===== /reservations (Reservation 헤더 필수) =====
@@ -142,6 +149,7 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_method.proxy,
       aws_api_gateway_integration.proxy,
       aws_api_gateway_authorizer.reservation,
+      aws_api_gateway_gateway_response.unauthorized,
     ]))
   }
 
