@@ -38,7 +38,7 @@ module "vpc" {
 }
 
 module "security_groups" {
-  source = "../../modules/security_group"
+  source            = "../../modules/security_group"
   project_name      = var.project_name
   environment       = var.environment
   vpc_id            = module.vpc.vpc_id
@@ -46,7 +46,7 @@ module "security_groups" {
   allowed_ssh_cidrs = var.allowed_ssh_cidrs
 }
 module "secrets_manager" {
-  source = "../../modules/secrets_manager"
+  source                          = "../../modules/secrets_manager"
   project_name                    = var.project_name
   environment                     = var.environment
   authorization_private_key_value = tls_private_key.authorization.private_key_pem
@@ -57,14 +57,14 @@ module "secrets_manager" {
   reservation_writer_endpoint     = module.rds.reservation_endpoint
 }
 module "iam" {
-  source = "../../modules/iam"
+  source            = "../../modules/iam"
   project_name      = var.project_name
   environment       = var.environment
   oidc_provider_arn = var.oidc_provider_arn
   oidc_provider_url = var.oidc_provider_url
 }
 module "rds" {
-  source = "../../modules/rds"
+  source                 = "../../modules/rds"
   project_name           = var.project_name
   environment            = var.environment
   db_name                = var.db_name
@@ -78,7 +78,7 @@ module "rds" {
   subnet_ids             = module.vpc.private_subnet_ids
 }
 module "cloudfront" {
-  source = "../../modules/cloudfront"
+  source                         = "../../modules/cloudfront"
   project_name                   = var.project_name
   environment                    = var.environment
   s3_bucket_name                 = var.s3_bucket_name
