@@ -98,6 +98,12 @@ module "sqs" {
   name         = "reservation-leaky-bucket"
 }
 
+# SQS(예약 큐) → persistence 람다 트리거
+resource "aws_lambda_event_source_mapping" "persistence_sqs" {
+  event_source_arn = module.sqs.queue_arn
+  function_name    = module.lambda.function_arns["persistence"]
+}
+
 # Lambda — zip/목록은 S3, 모듈별 env 주입 (값은 GitHub env→converter 수신)
 module "lambda" {
   source          = "../../modules/lambda"
