@@ -106,8 +106,8 @@ module "lambda" {
       RESERVATION_DB_URL = var.reservation_db_url
     }
     ticketing = {
-      REDIS_HOST = var.redis_host
-      REDIS_PORT = var.redis_port
+      REDIS_HOST = module.elasticache.main_cache_endpoint
+      REDIS_PORT = "6379"
       JWT_SECRET = var.jwt_secret
     }
   }
@@ -122,4 +122,29 @@ module "apigateway" {
   reservation_backend_url    = "http://${aws_instance.test_service.public_dns}:${var.test_service_port}"
   queue_lambda_invoke_arn    = module.lambda.invoke_arns["ticketing"]
   queue_lambda_function_name = module.lambda.function_names["ticketing"]
+}
+
+# ElastiCache (Redis/Valkey) — 서브넷그룹은 모듈 내부 생성, SG 는 security_group 모듈
+module "elasticache" {
+  source            = "../../modules/elasticache"
+  subnet_group_name = "${var.project_name}-${var.environment}-cache"
+  subnet_ids        = module.vpc.private_subnet_ids
+
+  main_cache_replication_group_id = "${var.project_name}-${var.environment}-main-cache"
+  main_cache_engine               = "valkey"
+  main_cache_engine_version       = "8.0"
+  main_cache_parameter_group_name = "default.valkey8"
+  main_cache_node_type            = "cache.t3.micro"
+  main_cache_port                 = 6379
+  main_cache_num_clusters         = 1
+  main_cache_sg_id                = module.security_groups.cache_sg_id
+
+  waiting_room_replication_group_id   = "${var.project_name}-${var.environment}-waiting-room"
+  waiting_room_engine                 = "redis"
+  waiting_room_engine_version         = "7.1"
+  waiting_room_parameter_group_family = "redis7"
+  waiting_room_node_type              = "cache.t3.micro"
+  waiting_room_port                   = 6379
+  waiting_room_num_clusters           = 1
+  waiting_room_sg_id                  = module.security_groups.cache_sg_id
 }

@@ -136,18 +136,6 @@ variable "reservation_db_url" {
   default     = ""
 }
 
-variable "redis_host" {
-  description = "ticketing 람다용 Redis 호스트 (elasticache 미배포 시 placeholder)"
-  type        = string
-  default     = ""
-}
-
-variable "redis_port" {
-  description = "ticketing 람다용 Redis 포트"
-  type        = string
-  default     = "6379"
-}
-
 variable "jwt_secret" {
   description = "ticketing 람다용 JWT 시크릿"
   type        = string
