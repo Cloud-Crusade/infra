@@ -150,7 +150,7 @@ resource "aws_instance" "test_service" {
 ENV=production
 CORS_ALLOW_ORIGINS=["*"]
 CORE_WRITER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_endpoint}/${var.db_name}
-CORE_READER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_replica_endpoint}/${var.db_name}
+CORE_READER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_endpoint}/${var.db_name}
 RESERVATION_WRITER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_endpoint}/${var.db_name}
 RESERVATION_READER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_replica_endpoint}/${var.db_name}
 REDIS_URL=redis://${module.elasticache.main_cache_endpoint}:6379/0
