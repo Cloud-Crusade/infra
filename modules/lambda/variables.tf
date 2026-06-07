@@ -22,6 +22,11 @@ variable "artifact_prefix" {
   type        = string
   description = "아티팩트 S3 prefix (예: lambda/)"
   default     = "lambda/"
+
+  validation {
+    condition     = var.artifact_prefix == "" || (endswith(var.artifact_prefix, "/") && !startswith(var.artifact_prefix, "/"))
+    error_message = "artifact_prefix 는 빈 문자열이거나 'lambda/' 처럼 끝에 '/' 가 있고 시작에 '/' 가 없어야 합니다."
+  }
 }
 
 variable "lambda_env" {
