@@ -1,0 +1,141 @@
+# =========================================================
+# dev 통합 테스트용 EC2 — ECR 서비스 레이어 이미지 구동
+# (임시 테스트 픽스처: 테스트 종료 후 이 파일만 제거하면 됨)
+# =========================================================
+
+variable "test_service_image" {
+  description = "ECR 서비스 이미지 URI (예: <acct>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>). 실값은 GitHub var/tfvars 로 주입"
+  type        = string
+  default     = ""
+}
+
+variable "test_service_port" {
+  description = "컨테이너 서비스 포트"
+  type        = number
+  default     = 8000
+}
+
+variable "test_ec2_instance_type" {
+  description = "테스트 EC2 인스턴스 타입"
+  type        = string
+  default     = "t3.small"
+}
+
+variable "test_service_ingress_cidrs" {
+  description = "서비스 포트 인바운드 허용 CIDR (테스트 편의상 기본 전체 — 운영 금지)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+# 최신 Amazon Linux 2023 (x86_64)
+data "aws_ami" "al2023" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+}
+
+# ECR pull 권한 인스턴스 프로파일
+data "aws_iam_policy_document" "test_ec2_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "test_ec2" {
+  name               = "${var.project_name}-${var.environment}-test-ec2"
+  assume_role_policy = data.aws_iam_policy_document.test_ec2_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "test_ec2_ecr" {
+  role       = aws_iam_role.test_ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_instance_profile" "test_ec2" {
+  name = "${var.project_name}-${var.environment}-test-ec2"
+  role = aws_iam_role.test_ec2.name
+}
+
+# 테스트 EC2 보안 그룹 (서비스 포트 + SSH)
+resource "aws_security_group" "test_ec2" {
+  name        = "${var.project_name}-${var.environment}-test-ec2-sg"
+  description = "Test EC2 running ECR service image"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    description = "service port"
+    from_port   = var.test_service_port
+    to_port     = var.test_service_port
+    protocol    = "tcp"
+    cidr_blocks = var.test_service_ingress_cidrs
+  }
+
+  ingress {
+    description = "ssh"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_ssh_cidrs
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-test-ec2-sg"
+  }
+}
+
+resource "aws_instance" "test_service" {
+  ami                         = data.aws_ami.al2023.id
+  instance_type               = var.test_ec2_instance_type
+  subnet_id                   = module.vpc.public_subnet_ids[0]
+  associate_public_ip_address = true
+  vpc_security_group_ids      = [aws_security_group.test_ec2.id]
+  iam_instance_profile        = aws_iam_instance_profile.test_ec2.name
+  key_name                    = aws_key_pair.bastion.key_name
+
+  # docker 설치 → ECR 로그인 → 이미지 pull → run
+  user_data = <<-EOF
+    #!/bin/bash
+    set -euxo pipefail
+    dnf install -y docker
+    systemctl enable --now docker
+
+    IMAGE="${var.test_service_image}"
+    REGISTRY=$(echo "$IMAGE" | cut -d/ -f1)
+    aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin "$REGISTRY"
+    docker pull "$IMAGE"
+    docker run -d --restart always -p ${var.test_service_port}:${var.test_service_port} "$IMAGE"
+  EOF
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-test-service"
+  }
+}
+
+output "test_service_public_ip" {
+  description = "테스트 EC2 퍼블릭 IP"
+  value       = aws_instance.test_service.public_ip
+}
+
+output "test_service_public_dns" {
+  description = "테스트 EC2 퍼블릭 DNS (API Gateway 예약 백엔드 등 연결용)"
+  value       = aws_instance.test_service.public_dns
+}
