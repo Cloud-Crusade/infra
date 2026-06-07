@@ -127,16 +127,6 @@ variable "db_allocated_storage" {
   default     = 20
 }
 
-# ===== Lambda 환경변수 (GitHub env → converter 수신) =====
-
-variable "reservation_db_url" {
-  description = "persistence 람다용 예약 DB 접속 URL"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-
 # ===== Public 버킷 =====
 
 variable "public_bucket" {

@@ -119,7 +119,8 @@ module "lambda" {
 
   lambda_env = {
     persistence = {
-      RESERVATION_DB_URL = var.reservation_db_url
+      # SQS 로 받은 예약 데이터를 reservation RDS 에 적재(psycopg2). URL 은 rds 에서 구성
+      RESERVATION_DB_URL = "postgresql://${var.db_username}:${var.db_password}@${module.rds.reservation_endpoint}/${var.db_name}"
     }
     ticketing = {
       REDIS_HOST = module.elasticache.main_cache_endpoint
