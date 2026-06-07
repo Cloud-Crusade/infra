@@ -116,10 +116,10 @@ module "lambda" {
       # terraform 이 생성하는 예약 서명키(개인키) 주입 — 검증측은 S3 의 공개키 사용
       JWT_SECRET = tls_private_key.reservation.private_key_pem
     }
-    # 예약 토큰 서명 검증 authorizer — S3 의 reservation 공개키로 RS256 검증
+    # 예약 토큰 서명 검증 authorizer — CloudFront 로 reservation 공개키 fetch(RS256 검증)
+    # S3 직접 접근 대신 CloudFront URL → S3 IAM 불필요 + 접근 비용 절감
     authorizer = {
-      PUBLIC_KEY_BUCKET = var.public_bucket
-      PUBLIC_KEY_KEY    = "jwt/${var.environment}/reservation/public_key.pem"
+      PUBLIC_KEY_URL = "https://${module.cloudfront.cloudfront_domain_name}/jwt/${var.environment}/reservation/public_key.pem"
     }
   }
 }
