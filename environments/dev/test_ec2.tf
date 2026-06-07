@@ -162,7 +162,7 @@ SQS_RESERVATION_QUEUE_URL=${module.sqs.queue_url}
 SEAT_HOLD_TTL_SECONDS=300
 ENVEOF
 
-    docker run -d --restart always -p ${var.test_service_port}:${var.test_service_port} --env-file /opt/app.env "$IMAGE"
+    docker run -d --restart always -p ${var.test_service_port}:${var.test_service_port} -v /opt/app.env:/app/.env:ro "$IMAGE"
   EOF
 
   tags = {
