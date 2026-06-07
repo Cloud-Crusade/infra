@@ -6,19 +6,15 @@ resource "aws_api_gateway_rest_api" "this" {
   name = "${local.name}-rest-api"
 }
 
-# 필수 파라미터(헤더) 검증기 — 예약 경로의 Reservation 헤더 누락을 통합 호출 전에 거부
-resource "aws_api_gateway_request_validator" "params" {
-  name                        = "${local.name}-params"
-  rest_api_id                 = aws_api_gateway_rest_api.this.id
-  validate_request_parameters = true
-  validate_request_body       = false
-}
-
-# 필수 파라미터 누락(기본 400)을 403 으로 변경 — "Reservation 헤더 없으면 403"
-resource "aws_api_gateway_gateway_response" "missing_params" {
-  rest_api_id   = aws_api_gateway_rest_api.this.id
-  response_type = "BAD_REQUEST_PARAMETERS"
-  status_code   = "403"
+# 예약 토큰(Reservation) RS256 서명 검증 Lambda authorizer
+# authorizer 람다가 S3 의 reservation 공개키로 서명 검증(공개키 위치는 authorizer 람다 env)
+# - Reservation 헤더 없음 → 401, 서명 무효 → 403, 유효 → 통과
+resource "aws_api_gateway_authorizer" "reservation" {
+  name            = "${local.name}-reservation-authorizer"
+  rest_api_id     = aws_api_gateway_rest_api.this.id
+  type            = "REQUEST"
+  authorizer_uri  = var.authorizer_lambda_invoke_arn
+  identity_source = "method.request.header.Reservation"
 }
 
 # ===== /reservations (Reservation 헤더 필수) =====
@@ -29,12 +25,11 @@ resource "aws_api_gateway_resource" "reservations" {
 }
 
 resource "aws_api_gateway_method" "reservations" {
-  rest_api_id          = aws_api_gateway_rest_api.this.id
-  resource_id          = aws_api_gateway_resource.reservations.id
-  http_method          = "ANY"
-  authorization        = "NONE"
-  request_validator_id = aws_api_gateway_request_validator.params.id
-  request_parameters   = { "method.request.header.Reservation" = true }
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.reservations.id
+  http_method   = "ANY"
+  authorization = "CUSTOM"
+  authorizer_id = aws_api_gateway_authorizer.reservation.id
 }
 
 resource "aws_api_gateway_integration" "reservations" {
@@ -54,13 +49,12 @@ resource "aws_api_gateway_resource" "reservation_item" {
 }
 
 resource "aws_api_gateway_method" "reservation_item" {
-  rest_api_id          = aws_api_gateway_rest_api.this.id
-  resource_id          = aws_api_gateway_resource.reservation_item.id
-  http_method          = "ANY"
-  authorization        = "NONE"
-  request_validator_id = aws_api_gateway_request_validator.params.id
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.reservation_item.id
+  http_method   = "ANY"
+  authorization = "CUSTOM"
+  authorizer_id = aws_api_gateway_authorizer.reservation.id
   request_parameters = {
-    "method.request.header.Reservation"  = true
     "method.request.path.reservation_id" = true
   }
 }
@@ -147,7 +141,7 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_integration.queue,
       aws_api_gateway_method.proxy,
       aws_api_gateway_integration.proxy,
-      aws_api_gateway_gateway_response.missing_params,
+      aws_api_gateway_authorizer.reservation,
     ]))
   }
 
@@ -169,4 +163,13 @@ resource "aws_lambda_permission" "queue" {
   function_name = var.queue_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/*/*/queue/*"
+}
+
+# 게이트웨이 → authorizer Lambda invoke 권한
+resource "aws_lambda_permission" "authorizer" {
+  statement_id  = "AllowApiGatewayInvokeAuthorizer"
+  action        = "lambda:InvokeFunction"
+  function_name = var.authorizer_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/authorizers/${aws_api_gateway_authorizer.reservation.id}"
 }

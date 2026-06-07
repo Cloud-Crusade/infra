@@ -27,3 +27,13 @@ variable "queue_lambda_function_name" {
   description = "queue Lambda 함수 이름 (invoke 권한 부여용)"
   type        = string
 }
+
+variable "authorizer_lambda_invoke_arn" {
+  description = "예약 토큰 서명 검증 authorizer Lambda 의 invoke ARN (모듈 외부 생성)"
+  type        = string
+}
+
+variable "authorizer_lambda_function_name" {
+  description = "authorizer Lambda 함수 이름 (invoke 권한 부여용)"
+  type        = string
+}
