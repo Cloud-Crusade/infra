@@ -90,7 +90,7 @@ module "sqs" {
   source       = "../../modules/sqs"
   project_name = var.project_name
   environment  = var.environment
-  name         = "reservation"
+  name         = "reservation-leaky-bucket"
 }
 
 # Lambda — zip/목록은 S3, 모듈별 env 주입 (값은 GitHub env→converter 수신)
