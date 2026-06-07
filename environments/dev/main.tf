@@ -82,11 +82,12 @@ module "rds" {
   subnet_ids             = module.vpc.private_subnet_ids
 }
 module "cloudfront" {
-  source                         = "../../modules/cloudfront"
-  project_name                   = var.project_name
-  environment                    = var.environment
-  s3_bucket_name                 = var.s3_bucket_name
-  s3_bucket_regional_domain_name = var.s3_bucket_regional_domain_name
+  source       = "../../modules/cloudfront"
+  project_name = var.project_name
+  environment  = var.environment
+  # web 정적 호스팅 + JWT 공개키가 같은 public 버킷 → CloudFront 로 접근 비용 절감
+  s3_bucket_name                 = var.public_bucket
+  s3_bucket_regional_domain_name = "${var.public_bucket}.s3.${var.aws_region}.amazonaws.com"
 }
 
 # 예약 데이터 임시 큐 (서비스 produce → persistence 람다 consume)

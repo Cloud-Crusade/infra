@@ -140,16 +140,6 @@ variable "reservation_db_url" {
 # ===== Public 버킷 =====
 
 variable "public_bucket" {
-  description = "공개 접근 S3 버킷 이름 (client 정적 호스팅·공개 리소스·JWT 공개키 등, state 버킷과 분리)"
-  type        = string
-}
-
-variable "s3_bucket_name" {
-  description = "CloudFront와 연결할 S3 버킷 이름"
-  type        = string
-}
-
-variable "s3_bucket_regional_domain_name" {
-  description = "S3 버킷 리전 도메인 이름"
+  description = "공개 접근 S3 버킷 이름 (web 정적 호스팅 + 공개 리소스 + JWT 공개키, state 버킷과 분리). CloudFront origin 도 이 버킷"
   type        = string
 }
