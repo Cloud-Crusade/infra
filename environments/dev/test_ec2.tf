@@ -63,6 +63,19 @@ resource "aws_iam_role_policy_attachment" "test_ec2_ecr" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+# 앱이 예약 큐로 produce — 인스턴스 롤로 SQS 접근(정적 키 미사용)
+resource "aws_iam_role_policy" "test_ec2_sqs" {
+  role = aws_iam_role.test_ec2.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["sqs:SendMessage", "sqs:GetQueueUrl", "sqs:GetQueueAttributes"]
+      Resource = module.sqs.queue_arn
+    }]
+  })
+}
+
 resource "aws_iam_instance_profile" "test_ec2" {
   name = "${var.project_name}-${var.environment}-test-ec2"
   role = aws_iam_role.test_ec2.name
@@ -102,6 +115,16 @@ resource "aws_security_group" "test_ec2" {
   }
 }
 
+# 테스트 EC2 → RDS 5432 허용 (rds SG 는 기본적으로 bastion 만 허용)
+resource "aws_security_group_rule" "rds_from_test_ec2" {
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = module.security_groups.rds_sg_id
+  source_security_group_id = aws_security_group.test_ec2.id
+}
+
 resource "aws_instance" "test_service" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = var.test_ec2_instance_type
@@ -122,7 +145,24 @@ resource "aws_instance" "test_service" {
     REGISTRY=$(echo "$IMAGE" | cut -d/ -f1)
     aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin "$REGISTRY"
     docker pull "$IMAGE"
-    docker run -d --restart always -p ${var.test_service_port}:${var.test_service_port} "$IMAGE"
+
+    cat > /opt/app.env <<'ENVEOF'
+ENV=production
+CORS_ALLOW_ORIGINS=["*"]
+CORE_WRITER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_endpoint}/${var.db_name}
+CORE_READER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_replica_endpoint}/${var.db_name}
+RESERVATION_WRITER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_endpoint}/${var.db_name}
+RESERVATION_READER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_replica_endpoint}/${var.db_name}
+REDIS_URL=redis://${module.elasticache.main_cache_endpoint}:6379/0
+JWT_SECRET=${random_password.authorization.result}
+JWT_ACCESS_TTL_SECONDS=1800
+JWT_REFRESH_TTL_SECONDS=1209600
+AWS_REGION=${var.aws_region}
+SQS_RESERVATION_QUEUE_URL=${module.sqs.queue_url}
+SEAT_HOLD_TTL_SECONDS=300
+ENVEOF
+
+    docker run -d --restart always -p ${var.test_service_port}:${var.test_service_port} --env-file /opt/app.env "$IMAGE"
   EOF
 
   tags = {
