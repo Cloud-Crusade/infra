@@ -1,5 +1,5 @@
 output "main_cache_endpoint" {
-  description = "main 캐시 엔드포인트"
+  description = "Main 캐시 엔드포인트"
   value       = aws_elasticache_replication_group.main_cache.primary_endpoint_address
 }
 

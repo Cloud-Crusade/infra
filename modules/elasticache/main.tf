@@ -17,10 +17,11 @@ resource "aws_elasticache_replication_group" "main_cache" {
 }
 
 
-# 2. Leaky Bucket용 Cache (예약/결제 정합성 보장용) - Redis OSS 7.1
-resource "aws_elasticache_parameter_group" "waiting_room_cache" {
-  name   = "${var.leaky_bucket_replication_group_id}-params"
-  family = var.leaky_bucket_parameter_group_family
+
+# 2. Waiting Room Cache 
+resource "aws_elasticache_parameter_group" "waiting_room_params" {
+  name   = "${var.waiting_room_replication_group_id}-params"
+  family = var.waiting_room_parameter_group_family
 
   parameter {
     name  = "maxmemory-policy"
@@ -28,18 +29,18 @@ resource "aws_elasticache_parameter_group" "waiting_room_cache" {
   }
 }
 
-resource "aws_elasticache_replication_group" "leaky_bucket_cache" {
-  replication_group_id = var.leaky_bucket_replication_group_id
-  description          = "Redis Cache for Reservation Integrity"
+resource "aws_elasticache_replication_group" "waiting_room_cache" {
+  replication_group_id = var.waiting_room_replication_group_id
+  description          = "Cache for waiting room queue management and traffic control"
 
-  engine               = var.leaky_bucket_engine
-  engine_version       = var.leaky_bucket_engine_version
-  parameter_group_name = aws_elasticache_parameter_group.leaky_bucket_params.name
-  node_type            = var.leaky_bucket_node_type
-  port                 = var.leaky_bucket_port
+  engine               = var.waiting_room_engine
+  engine_version       = var.waiting_room_engine_version
+  parameter_group_name = aws_elasticache_parameter_group.waiting_room_params.name
+  node_type            = var.waiting_room_node_type
+  port                 = var.waiting_room_port
 
   subnet_group_name  = var.subnet_group_name
-  security_group_ids = [var.leaky_bucket_sg_id]
+  security_group_ids = [var.waiting_room_sg_id]
 
-  num_cache_clusters = var.leaky_bucket_num_clusters
+  num_cache_clusters = var.waiting_room_num_clusters
 }

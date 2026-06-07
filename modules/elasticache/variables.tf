@@ -9,9 +9,9 @@ variable "main_cache_sg_id" {
   description = "Main Cache용 보안 그룹 ID"
 }
 
-variable "leaky_bucket_sg_id" {
+variable "waiting_room_sg_id" {
   type        = string
-  description = "Leaky Bucket용 보안 그룹 ID"
+  description = "watiting_room 용 보안 그룹 ID"
 }
 
 
@@ -52,38 +52,37 @@ variable "main_cache_num_clusters" {
 }
 
 
-# Leaky Bucket용 Cache (Redis OSS 7.1) 사양 설정 변수
-variable "leaky_bucket_replication_group_id" {
+variable "waiting_room_replication_group_id" {
   type        = string
-  description = "예약/결제 리소스 식별 ID"
+  description = "대기열 관리 및 트래픽 제어를 위한 캐시 리소스 식별 ID"
 }
 
-variable "leaky_bucket_engine" {
+variable "waiting_room_engine" {
   type        = string
-  description = "Redis OSS 엔진 타입"
+  description = "Waiting Room 캐시에 사용할 Redis 엔진 타입"
 }
 
-variable "leaky_bucket_engine_version" {
+variable "waiting_room_engine_version" {
   type        = string
-  description = "Redis OSS 엔진 버전"
+  description = "Redis 엔진 버전"
 }
 
-variable "leaky_bucket_parameter_group_family" {
+variable "waiting_room_parameter_group_family" {
   type        = string
-  description = "엔진 제품군 그룹 명칭"
+  description = "Redis 파라미터 그룹 패밀리"
 }
 
-variable "leaky_bucket_node_type" {
+variable "waiting_room_node_type" {
   type        = string
-  description = "인스턴스 사양"
+  description = "Waiting Room 캐시 인스턴스 사양"
 }
 
-variable "leaky_bucket_port" {
+variable "waiting_room_port" {
   type        = number
-  description = "리스닝 포트 번호"
+  description = "Waiting Room 캐시 서비스 포트 번호"
 }
 
-variable "leaky_bucket_num_clusters" {
+variable "waiting_room_num_clusters" {
   type        = number
-  description = "독립 노드 개수"
+  description = "Waiting Room 캐시 노드 개수"
 }
