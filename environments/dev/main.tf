@@ -84,3 +84,42 @@ module "cloudfront" {
   s3_bucket_name                 = var.s3_bucket_name
   s3_bucket_regional_domain_name = var.s3_bucket_regional_domain_name
 }
+
+# 예약 데이터 임시 큐 (서비스 produce → persistence 람다 consume)
+module "sqs" {
+  source       = "../../modules/sqs"
+  project_name = var.project_name
+  environment  = var.environment
+  name         = "reservation"
+}
+
+# Lambda — zip/목록은 S3, 모듈별 env 주입 (값은 GitHub env→converter 수신)
+module "lambda" {
+  source          = "../../modules/lambda"
+  project_name    = var.project_name
+  environment     = var.environment
+  lambda_role_arn = module.iam.lambda_role_arn
+  artifact_bucket = "tfstate-bucket-d8f5bb8d"
+
+  lambda_env = {
+    persistence = {
+      RESERVATION_DB_URL = var.reservation_db_url
+    }
+    ticketing = {
+      REDIS_HOST = var.redis_host
+      REDIS_PORT = var.redis_port
+      JWT_SECRET = var.jwt_secret
+    }
+  }
+}
+
+# API Gateway — app/예약 백엔드는 테스트 EC2(ticketing-app), queue 는 ticketing 람다
+module "apigateway" {
+  source                     = "../../modules/apigateway"
+  project_name               = var.project_name
+  environment                = var.environment
+  app_backend_url            = "http://${aws_instance.test_service.public_dns}:${var.test_service_port}"
+  reservation_backend_url    = "http://${aws_instance.test_service.public_dns}:${var.test_service_port}"
+  queue_lambda_invoke_arn    = module.lambda.invoke_arns["ticketing"]
+  queue_lambda_function_name = module.lambda.function_names["ticketing"]
+}
