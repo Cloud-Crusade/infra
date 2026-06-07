@@ -5,5 +5,5 @@ output "main_cache_endpoint" {
 
 output "leaky_bucket_cache_endpoint" {
   value       = aws_elasticache_replication_group.leaky_bucket_cache.primary_endpoint_address
-  description = "Redis 엔드포인트 주소"
+  description = "leaky bucket 엔드포인트 주소"
 }
