@@ -2,19 +2,19 @@
 # Secrets Manager 시크릿 정의
 # ==============================
 
-# Private Key 시크릿
-resource "aws_secretsmanager_secret" "authorization_private_key" {
-  name        = "${var.environment}-authorization-private-key"
-  description = "JWT 서명용 Private Key"
+# Authorization 시크릿 (HS256 대칭키)
+resource "aws_secretsmanager_secret" "authorization_secret" {
+  name        = "${var.environment}-authorization-secret"
+  description = "JWT 서명용 대칭 시크릿 (HS256)"
 
   tags = {
-    Name = "${var.environment}-authorization-private-key"
+    Name = "${var.environment}-authorization-secret"
   }
 }
 
-resource "aws_secretsmanager_secret_version" "authorization_private_key" {
-  secret_id     = aws_secretsmanager_secret.authorization_private_key.id
-  secret_string = var.authorization_private_key_value
+resource "aws_secretsmanager_secret_version" "authorization_secret" {
+  secret_id     = aws_secretsmanager_secret.authorization_secret.id
+  secret_string = var.authorization_secret_value
 }
 
 # Lambda가 JWT 토큰 서명 시 사용하는 비공개 키

@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/tls"
       version = "~> 4.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -46,15 +50,15 @@ module "security_groups" {
   allowed_ssh_cidrs = var.allowed_ssh_cidrs
 }
 module "secrets_manager" {
-  source                          = "../../modules/secrets_manager"
-  project_name                    = var.project_name
-  environment                     = var.environment
-  authorization_private_key_value = tls_private_key.authorization.private_key_pem
-  reservation_private_key_value   = tls_private_key.reservation.private_key_pem
-  rds_username                    = var.db_username
-  rds_password                    = var.db_password
-  core_writer_endpoint            = module.rds.primary_endpoint
-  reservation_writer_endpoint     = module.rds.reservation_endpoint
+  source                        = "../../modules/secrets_manager"
+  project_name                  = var.project_name
+  environment                   = var.environment
+  authorization_secret_value    = random_password.authorization.result
+  reservation_private_key_value = tls_private_key.reservation.private_key_pem
+  rds_username                  = var.db_username
+  rds_password                  = var.db_password
+  core_writer_endpoint          = module.rds.primary_endpoint
+  reservation_writer_endpoint   = module.rds.reservation_endpoint
 }
 module "iam" {
   source            = "../../modules/iam"
