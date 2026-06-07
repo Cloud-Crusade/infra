@@ -136,12 +136,6 @@ variable "reservation_db_url" {
   default     = ""
 }
 
-variable "jwt_secret" {
-  description = "ticketing 람다용 JWT 시크릿"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
 
 # ===== Public 버킷 =====
 

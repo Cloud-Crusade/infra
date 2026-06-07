@@ -108,7 +108,8 @@ module "lambda" {
     ticketing = {
       REDIS_HOST = module.elasticache.main_cache_endpoint
       REDIS_PORT = "6379"
-      JWT_SECRET = var.jwt_secret
+      # terraform 이 생성하는 예약 서명키(개인키) 주입 — 검증측은 S3 의 공개키 사용
+      JWT_SECRET = tls_private_key.reservation.private_key_pem
     }
   }
 }
