@@ -59,3 +59,31 @@ resource "aws_cloudfront_distribution" "main" {
     Name = "${var.environment}-cloudfront"
   }
 }
+
+# ==============================
+# S3 버킷 정책 (OAC 접근 허용)
+# ==============================
+
+# CloudFront(OAC) 가 퍼블릭 버킷 객체(예: 공개키)를 읽을 수 있도록 허용.
+# 이 정책이 없으면 OAC 가 있어도 S3 가 AccessDenied 를 반환한다.
+resource "aws_s3_bucket_policy" "cloudfront_oac" {
+  bucket = var.s3_bucket_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AllowCloudFrontOACReadOnly"
+        Effect    = "Allow"
+        Principal = { Service = "cloudfront.amazonaws.com" }
+        Action    = "s3:GetObject"
+        Resource  = "arn:aws:s3:::${var.s3_bucket_name}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.main.arn
+          }
+        }
+      }
+    ]
+  })
+}
