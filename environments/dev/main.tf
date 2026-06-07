@@ -106,6 +106,11 @@ module "lambda" {
   lambda_role_arn = module.iam.lambda_role_arn
   artifact_bucket = "tfstate-bucket-d8f5bb8d"
 
+  # ticketing → ElastiCache, persistence → RDS (VPC 내부). authorizer 는 CloudFront 접근 위해 VPC 제외
+  vpc_modules            = ["ticketing", "persistence"]
+  vpc_subnet_ids         = module.vpc.private_subnet_ids
+  vpc_security_group_ids = [module.security_groups.lambda_sg_id]
+
   lambda_env = {
     persistence = {
       RESERVATION_DB_URL = var.reservation_db_url

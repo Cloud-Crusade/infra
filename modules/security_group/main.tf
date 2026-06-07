@@ -31,7 +31,7 @@ resource "aws_security_group" "rds" {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [aws_security_group.bastion.id]
+    security_groups = [aws_security_group.bastion.id, aws_security_group.lambda.id]
   }
 
   # 전 포트 허용(protocol -1)하되 목적지는 VPC 내부로만 한정
@@ -92,5 +92,23 @@ resource "aws_security_group" "cache" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-cache-sg"
+  }
+}
+
+# VPC 연결 람다용 SG (egress 로 ElastiCache/RDS 등 접근)
+resource "aws_security_group" "lambda" {
+  name        = "${var.project_name}-${var.environment}-lambda-sg"
+  description = "Security Group for VPC-attached Lambdas"
+  vpc_id      = var.vpc_id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-lambda-sg"
   }
 }

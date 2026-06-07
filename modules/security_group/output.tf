@@ -13,3 +13,7 @@ output "eks_sg_id" {
 output "cache_sg_id" {
   value = aws_security_group.cache.id
 }
+
+output "lambda_sg_id" {
+  value = aws_security_group.lambda.id
+}

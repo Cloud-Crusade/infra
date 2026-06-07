@@ -41,11 +41,24 @@ resource "aws_lambda_function" "this" {
     }
   }
 
-  # function_url_modules 에 오타/미존재 모듈이 들어가면 조용히 무시되지 않도록 조기 실패
+  # vpc_modules 에 포함된 모듈만 VPC 연결 (ElastiCache/RDS 등 VPC 내부 접근)
+  dynamic "vpc_config" {
+    for_each = contains(var.vpc_modules, each.key) ? [1] : []
+    content {
+      subnet_ids         = var.vpc_subnet_ids
+      security_group_ids = var.vpc_security_group_ids
+    }
+  }
+
+  # function_url_modules / vpc_modules 에 오타·미존재 모듈이 들어가면 조기 실패
   lifecycle {
     precondition {
       condition     = length(setsubtract(var.function_url_modules, local.modules)) == 0
       error_message = "function_url_modules 에 lambda-modules.txt 에 없는 모듈이 있습니다: ${join(", ", setsubtract(var.function_url_modules, local.modules))}"
+    }
+    precondition {
+      condition     = length(setsubtract(var.vpc_modules, local.modules)) == 0
+      error_message = "vpc_modules 에 lambda-modules.txt 에 없는 모듈이 있습니다: ${join(", ", setsubtract(var.vpc_modules, local.modules))}"
     }
   }
 }
