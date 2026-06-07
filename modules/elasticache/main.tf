@@ -1,6 +1,6 @@
 
 # 1. Main Cache (대기열 확인 및 Atomic Check 보장용) - Valkey 9.0
-resource "aws_elasticache_replication_group" "main_service_cache" {
+resource "aws_elasticache_replication_group" "main_cache" {
   replication_group_id = var.main_cache_replication_group_id
   description          = "Main Cache for Virtual Waiting Room Atomic Check"
 
@@ -18,7 +18,7 @@ resource "aws_elasticache_replication_group" "main_service_cache" {
 
 
 # 2. Leaky Bucket용 Cache (예약/결제 정합성 보장용) - Redis OSS 7.1
-resource "aws_elasticache_parameter_group" "leaky_bucket_params" {
+resource "aws_elasticache_parameter_group" "waiting_room_cache" {
   name   = "${var.leaky_bucket_replication_group_id}-params"
   family = var.leaky_bucket_parameter_group_family
 

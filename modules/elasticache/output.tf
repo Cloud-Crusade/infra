@@ -1,9 +1,9 @@
 output "main_cache_endpoint" {
-  value       = aws_elasticache_replication_group.main_service_cache.primary_endpoint_address
-  description = "Valkey 엔드포인트 주소"
+  description = "main 캐시 엔드포인트"
+  value       = aws_elasticache_replication_group.main_cache.primary_endpoint_address
 }
 
-output "leaky_bucket_cache_endpoint" {
-  value       = aws_elasticache_replication_group.leaky_bucket_cache.primary_endpoint_address
-  description = "leaky bucket 엔드포인트 주소"
+output "waiting_room_cache_endpoint" {
+  description = "Waiting Room 캐시 엔드포인트"
+  value       = aws_elasticache_replication_group.waiting_room_cache.primary_endpoint_address
 }
