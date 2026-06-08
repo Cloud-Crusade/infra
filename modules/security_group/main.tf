@@ -1,6 +1,6 @@
 resource "aws_security_group" "bastion" {
   name        = "${var.project_name}-${var.environment}-bastion-sg"
-  description = "Bastion host에 적용하는 Security Group"
+  description = "Security Group for Bastion host"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -24,21 +24,22 @@ resource "aws_security_group" "bastion" {
 
 resource "aws_security_group" "rds" {
   name        = "${var.project_name}-${var.environment}-rds-sg"
-  description = "RDS에 적용하는 Security Group"
+  description = "Security Group for RDS instances"
   vpc_id      = var.vpc_id
 
   ingress {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [aws_security_group.bastion.id, aws_security_group.bastion.id]
+    security_groups = [aws_security_group.bastion.id]
   }
 
+  # 전 포트 허용(protocol -1)하되 목적지는 VPC 내부로만 한정
   egress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = ["0.0.0.0/0"]
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   tags = {
@@ -48,7 +49,7 @@ resource "aws_security_group" "rds" {
 
 resource "aws_security_group" "eks" {
   name        = "${var.project_name}-${var.environment}-eks-sg"
-  description = "EKS에 적용하는 Security Group"
+  description = "Security Group for EKS"
   vpc_id      = var.vpc_id
 
   ingress {

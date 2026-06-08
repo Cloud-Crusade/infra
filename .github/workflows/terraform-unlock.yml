@@ -1,0 +1,101 @@
+name: Terraform Unlock
+
+# "Terraform Plan" 이 plan 도중 취소되면 terraform 이 잡은 DynamoDB state lock 이
+# 남아 이후 같은 environment 의 plan/apply 가 state lock 에러로 실패한다.
+# 이 워크플로우는 그 취소를 감지(workflow_run)하거나 수동(workflow_dispatch)으로
+# 호출되어 남은 잠금을 해제한다.
+on:
+  workflow_run:
+    workflows: ["Terraform Plan"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "잠금을 해제할 environment"
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - dev
+          - prod
+
+# 잠금 해제 실행끼리 겹치지 않도록 직렬화 (진행 중인 해제는 취소하지 않음)
+concurrency:
+  group: terraform-unlock
+  cancel-in-progress: false
+
+jobs:
+  release-lock:
+    name: Release lock (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    # 수동 실행이거나, 앞선 Terraform Plan 이 '취소'로 끝난 경우에만 동작
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'cancelled'
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prod]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Release stale Terraform lock
+        working-directory: environments/${{ matrix.environment }}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_ENV: ${{ github.event.inputs.environment }}
+          MATRIX_ENV: ${{ matrix.environment }}
+        run: |
+          set -uo pipefail
+
+          # 수동 실행 시 선택한 environment(또는 all)만 처리
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && \
+             [ "$INPUT_ENV" != "all" ] && [ "$INPUT_ENV" != "$MATRIX_ENV" ]; then
+            echo "Skip ${MATRIX_ENV}: dispatch target is ${INPUT_ENV}."
+            exit 0
+          fi
+
+          # backend.tf 에서 잠금 식별 정보 추출 (하드코딩 없이 설정과 동기화)
+          bucket=$(grep -oP 'bucket\s*=\s*"\K[^"]+' backend.tf)
+          key=$(grep -oP '\bkey\s*=\s*"\K[^"]+' backend.tf)
+          table=$(grep -oP 'dynamodb_table\s*=\s*"\K[^"]+' backend.tf)
+          region=$(grep -oP 'region\s*=\s*"\K[^"]+' backend.tf | head -1)
+          lock_key="${bucket}/${key}"
+
+          info=$(aws dynamodb get-item \
+            --table-name "$table" --region "$region" \
+            --key "{\"LockID\":{\"S\":\"${lock_key}\"}}" \
+            --query 'Item.Info.S' --output text 2>/dev/null)
+
+          if [ -z "$info" ] || [ "$info" = "None" ]; then
+            echo "No active lock for ${lock_key}; nothing to release."
+            exit 0
+          fi
+
+          lock_id=$(echo "$info" | jq -r '.ID')
+          lock_who=$(echo "$info" | jq -r '.Who')
+          echo "Found lock ${lock_id} held by ${lock_who} on ${lock_key}"
+
+          # 조건부 삭제: 방금 읽은 잠금과 Info 가 동일할 때만 삭제한다.
+          # 읽은 직후 다른 실행이 잠금을 재획득했다면 Info 가 달라 조건이 실패하고
+          # (ConditionalCheckFailed) 잠금을 건드리지 않는다 → 다른 실행 보호.
+          values=$(printf '%s' "$info" | jq -Rs '{":info":{"S":.}}')
+          if aws dynamodb delete-item \
+              --table-name "$table" --region "$region" \
+              --key "{\"LockID\":{\"S\":\"${lock_key}\"}}" \
+              --condition-expression "Info = :info" \
+              --expression-attribute-values "$values"; then
+            echo "Released lock ${lock_id} on ${lock_key}."
+          else
+            echo "Lock changed since read (likely re-acquired by another run); left untouched."
+          fi

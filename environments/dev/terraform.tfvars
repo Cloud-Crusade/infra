@@ -42,3 +42,13 @@ eks_app_ng_max_size       = 3
 
 # TODO: 클러스터 접근이 필요한 IAM Role/User 추가
 eks_access_entries = []
+oidc_provider_arn  = ""
+oidc_provider_url  = ""
+
+db_username = "ccadmin"
+# db_password 는 민감값 → tfvars 평문 금지.
+# CI: GitHub Secret 이름을 DB_PASSWORD 로 (컨버터가 TF_VAR_ 접두사 + 소문자화 → TF_VAR_db_password)
+# 로컬: export TF_VAR_db_password=...
+
+s3_bucket_name                 = "einsof-service-625368338405-ap-northeast-2-an"
+s3_bucket_regional_domain_name = "einsof-service-625368338405-ap-northeast-2-an.s3.ap-northeast-2.amazonaws.com"
