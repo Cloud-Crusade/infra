@@ -93,8 +93,8 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   namespace           = "AWS/Lambda"
   metric_name         = "Errors"
   statistic           = "Sum"
-  period              = 300
-  evaluation_periods  = 1
+  period              = 60
+  evaluation_periods  = 3
   threshold           = 1
   comparison_operator = "GreaterThanOrEqualToThreshold"
 
@@ -371,4 +371,62 @@ resource "aws_cloudwatch_metric_alarm" "apigw_latency" {
 
   alarm_actions = [aws_sns_topic.alarm.arn]
   ok_actions    = [aws_sns_topic.alarm.arn]
+}
+
+# ===== CloudWatch 대시보드 =====
+
+resource "aws_cloudwatch_dashboard" "main" {
+  dashboard_name = "${var.project_name}-${var.environment}-dashboard"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      # Lambda 에러
+      {
+        type = "metric"
+        properties = {
+          title  = "Lambda Errors"
+          metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Errors", "FunctionName", fn]]
+          period = 60
+          stat   = "Sum"
+          view   = "timeSeries"
+        }
+      },
+      # Lambda 실행 시간
+      {
+        type = "metric"
+        properties = {
+          title  = "Lambda Duration"
+          metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Duration", "FunctionName", fn]]
+          period = 60
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      # RDS CPU
+      {
+        type = "metric"
+        properties = {
+          title  = "RDS CPU Utilization"
+          metrics = [for id in var.rds_instance_ids : ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", id]]
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      # CloudFront 에러율
+      {
+        type = "metric"
+        properties = {
+          title  = "CloudFront Error Rate"
+          metrics = var.cloudfront_distribution_id != "" ? [
+            ["AWS/CloudFront", "5xxErrorRate", "DistributionId", var.cloudfront_distribution_id, "Region", "Global"],
+            ["AWS/CloudFront", "4xxErrorRate", "DistributionId", var.cloudfront_distribution_id, "Region", "Global"]
+          ] : []
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      }
+    ]
+  })
 }
