@@ -84,3 +84,38 @@ module "cloudfront" {
   s3_bucket_name                 = var.s3_bucket_name
   s3_bucket_regional_domain_name = var.s3_bucket_regional_domain_name
 }
+module "cloudwatch" {
+  source = "../../modules/cloudwatch"
+
+  project_name = var.project_name
+  environment  = var.environment
+  alarm_email  = var.alarm_email
+
+  # RDS
+  rds_instance_ids = [
+    "${var.project_name}-${var.environment}-primary",
+    "${var.project_name}-${var.environment}-primary-replica",
+    "${var.project_name}-${var.environment}-reservation",
+    "${var.project_name}-${var.environment}-reservation-replica",
+    "${var.project_name}-${var.environment}-reservation-replica-2",
+  ]
+
+  # Lambda (모듈 연결 후 활성화)
+  lambda_function_names = [
+    "${var.project_name}-${var.environment}-authorizer",
+    "${var.project_name}-${var.environment}-ticketing",
+    "${var.project_name}-${var.environment}-persistence",
+  ]
+
+  # CloudFront
+  cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
+
+  # ElastiCache (틀만 — 모듈 연결 후 활성화)
+  elasticache_cluster_ids = []
+
+  # SQS (틀만 — 모듈 연결 후 활성화)
+  sqs_queue_names = []
+
+  # EKS (틀만 — 모듈 연결 후 활성화)
+  eks_cluster_name = ""
+}

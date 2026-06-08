@@ -143,3 +143,11 @@ variable "s3_bucket_regional_domain_name" {
   description = "S3 버킷 리전 도메인 이름"
   type        = string
 }
+
+# ===== CloudWatch =====
+
+variable "alarm_email" {
+  description = "Email address to receive CloudWatch alarm notifications"
+  type        = string
+  default     = ""
+}
