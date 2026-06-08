@@ -108,7 +108,7 @@ module "cloudwatch" {
   ]
 
   # CloudFront
-  cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
+  cloudfront_distribution_id = ""
 
   # ElastiCache (틀만 — 모듈 연결 후 활성화)
   elasticache_cluster_ids = []
