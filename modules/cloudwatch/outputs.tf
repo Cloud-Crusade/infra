@@ -43,12 +43,12 @@ output "lambda_duration_alarm_arns" {
 
 output "cloudfront_5xx_alarm_arn" {
   description = "CloudFront 5xx error rate alarm ARN"
-  value       = length(aws_cloudwatch_metric_alarm.cloudfront_5xx) > 0 ? aws_cloudwatch_metric_alarm.cloudfront_5xx[0].arn : ""
+  value       = { for k, v in aws_cloudwatch_metric_alarm.cloudfront_5xx : k => v.arn }
 }
 
 output "cloudfront_4xx_alarm_arn" {
   description = "CloudFront 4xx error rate alarm ARN"
-  value       = length(aws_cloudwatch_metric_alarm.cloudfront_4xx) > 0 ? aws_cloudwatch_metric_alarm.cloudfront_4xx[0].arn : ""
+  value       = { for k, v in aws_cloudwatch_metric_alarm.cloudfront_4xx : k => v.arn }
 }
 
 # ===== ElastiCache (틀만 — 모듈 연결 후 활성화) =====
@@ -85,4 +85,21 @@ output "eks_node_cpu_alarm_arn" {
 output "eks_node_memory_alarm_arn" {
   description = "EKS node memory utilization alarm ARN (activate after module connection)"
   value       = length(aws_cloudwatch_metric_alarm.eks_node_memory) > 0 ? aws_cloudwatch_metric_alarm.eks_node_memory[0].arn : ""
+}
+
+# ===== API Gateway (모듈 연결 후 활성화) =====
+
+output "apigw_5xx_alarm_arn" {
+  description = "API Gateway 5xx error rate alarm ARN (activate after module connection)"
+  value       = { for k, v in aws_cloudwatch_metric_alarm.apigw_5xx : k => v.arn }
+}
+
+output "apigw_4xx_alarm_arn" {
+  description = "API Gateway 4xx error rate alarm ARN (activate after module connection)"
+  value       = { for k, v in aws_cloudwatch_metric_alarm.apigw_4xx : k => v.arn }
+}
+
+output "apigw_latency_alarm_arn" {
+  description = "API Gateway latency alarm ARN (activate after module connection)"
+  value       = { for k, v in aws_cloudwatch_metric_alarm.apigw_latency : k => v.arn }
 }

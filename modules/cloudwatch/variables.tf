@@ -65,3 +65,11 @@ variable "eks_cluster_name" {
   type        = string
   default     = ""
 }
+
+# ===== API Gateway (모듈 연결 후 활성화) =====
+
+variable "api_gateway_name" {
+  description = "REST API name to monitor (activate after module connection)"
+  type        = string
+  default     = ""
+}

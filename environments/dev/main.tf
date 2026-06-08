@@ -115,7 +115,9 @@ module "cloudwatch" {
 
   # SQS (틀만 — 모듈 연결 후 활성화)
   sqs_queue_names = []
-
   # EKS (틀만 — 모듈 연결 후 활성화)
   eks_cluster_name = ""
+
+  # API Gateway (틀만 — 모듈 연결 후 활성화)
+  api_gateway_name = ""
 }

@@ -130,7 +130,7 @@ resource "aws_cloudwatch_metric_alarm" "lambda_duration" {
 # ===== CloudFront 알람 =====
 
 resource "aws_cloudwatch_metric_alarm" "cloudfront_5xx" {
-  count = var.cloudfront_distribution_id != "" ? 1 : 0
+  for_each = var.cloudfront_distribution_id != "" ? toset([var.cloudfront_distribution_id]) : toset([])
 
   alarm_name          = "${var.project_name}-${var.environment}-cloudfront-5xx"
   alarm_description   = "CloudFront 5xx 에러율 5% 초과"
@@ -143,7 +143,7 @@ resource "aws_cloudwatch_metric_alarm" "cloudfront_5xx" {
   comparison_operator = "GreaterThanThreshold"
 
   dimensions = {
-    DistributionId = var.cloudfront_distribution_id
+    DistributionId = each.key
     Region         = "Global"
   }
 
@@ -152,7 +152,7 @@ resource "aws_cloudwatch_metric_alarm" "cloudfront_5xx" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "cloudfront_4xx" {
-  count = var.cloudfront_distribution_id != "" ? 1 : 0
+  for_each = var.cloudfront_distribution_id != "" ? toset([var.cloudfront_distribution_id]) : toset([])
 
   alarm_name          = "${var.project_name}-${var.environment}-cloudfront-4xx"
   alarm_description   = "CloudFront 4xx 에러율 10% 초과"
@@ -165,7 +165,7 @@ resource "aws_cloudwatch_metric_alarm" "cloudfront_4xx" {
   comparison_operator = "GreaterThanThreshold"
 
   dimensions = {
-    DistributionId = var.cloudfront_distribution_id
+    DistributionId = each.key
     Region         = "Global"
   }
 
@@ -299,6 +299,74 @@ resource "aws_cloudwatch_metric_alarm" "eks_node_memory" {
 
   dimensions = {
     ClusterName = var.eks_cluster_name
+  }
+
+  alarm_actions = [aws_sns_topic.alarm.arn]
+  ok_actions    = [aws_sns_topic.alarm.arn]
+}
+
+# ===== API Gateway 알람 (모듈 연결 후 활성화) =====
+
+resource "aws_cloudwatch_metric_alarm" "apigw_5xx" {
+  for_each = var.api_gateway_name != "" ? toset([var.api_gateway_name]) : toset([])
+
+  alarm_name          = "${var.project_name}-${var.environment}-apigw-5xx"
+  alarm_description   = "API Gateway 5xx 에러율 5% 초과"
+  namespace           = "AWS/ApiGateway"
+  metric_name         = "5XXError"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 5
+  comparison_operator = "GreaterThanThreshold"
+
+  dimensions = {
+    ApiName = each.key
+    Stage   = var.environment
+  }
+
+  alarm_actions = [aws_sns_topic.alarm.arn]
+  ok_actions    = [aws_sns_topic.alarm.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "apigw_4xx" {
+  for_each = var.api_gateway_name != "" ? toset([var.api_gateway_name]) : toset([])
+
+  alarm_name          = "${var.project_name}-${var.environment}-apigw-4xx"
+  alarm_description   = "API Gateway 4xx 에러율 10% 초과"
+  namespace           = "AWS/ApiGateway"
+  metric_name         = "4XXError"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 10
+  comparison_operator = "GreaterThanThreshold"
+
+  dimensions = {
+    ApiName = each.key
+    Stage   = var.environment
+  }
+
+  alarm_actions = [aws_sns_topic.alarm.arn]
+  ok_actions    = [aws_sns_topic.alarm.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "apigw_latency" {
+  for_each = var.api_gateway_name != "" ? toset([var.api_gateway_name]) : toset([])
+
+  alarm_name          = "${var.project_name}-${var.environment}-apigw-latency"
+  alarm_description   = "API Gateway 응답 시간 5초 초과"
+  namespace           = "AWS/ApiGateway"
+  metric_name         = "Latency"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 5000
+  comparison_operator = "GreaterThanThreshold"
+
+  dimensions = {
+    ApiName = each.key
+    Stage   = var.environment
   }
 
   alarm_actions = [aws_sns_topic.alarm.arn]
