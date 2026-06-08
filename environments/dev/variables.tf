@@ -67,3 +67,91 @@ variable "allowed_ssh_cidrs" {
   description = "Bastion host SSH 접근 허용 IP 목록"
   type        = list(string)
 }
+
+# ============================================================
+# EKS
+# ============================================================
+variable "eks_cluster_version" {
+  description = "Kubernetes 버전"
+  type        = string
+}
+
+variable "eks_endpoint_public_access" {
+  type    = bool
+  default = true
+}
+
+variable "eks_endpoint_private_access" {
+  type    = bool
+  default = true
+}
+
+variable "eks_endpoint_public_access_cidrs" {
+  type    = list(string)
+  default = ["0.0.0.0/0"]
+}
+
+variable "eks_enabled_log_types" {
+  type    = list(string)
+  default = ["api", "audit", "authenticator"]
+}
+
+variable "eks_system_ng_instance_types" {
+  type    = list(string)
+  default = ["t3.medium"]
+}
+
+variable "eks_system_ng_capacity_type" {
+  type    = string
+  default = "ON_DEMAND"
+}
+
+variable "eks_system_ng_desired_size" {
+  type    = number
+  default = 1
+}
+
+variable "eks_system_ng_min_size" {
+  type    = number
+  default = 1
+}
+
+variable "eks_system_ng_max_size" {
+  type    = number
+  default = 2
+}
+
+variable "eks_app_ng_instance_types" {
+  type    = list(string)
+  default = ["t3.medium"]
+}
+
+variable "eks_app_ng_capacity_type" {
+  type    = string
+  default = "ON_DEMAND"
+}
+
+variable "eks_app_ng_desired_size" {
+  type    = number
+  default = 1
+}
+
+variable "eks_app_ng_min_size" {
+  type    = number
+  default = 1
+}
+
+variable "eks_app_ng_max_size" {
+  type    = number
+  default = 3
+}
+
+variable "eks_access_entries" {
+  type = list(object({
+    principal_arn     = string
+    kubernetes_groups = optional(list(string), [])
+    type              = optional(string, "STANDARD")
+    policy_arn        = optional(string, null)
+  }))
+  default = []
+}
