@@ -11,8 +11,8 @@ terraform {
       version = "~> 4.0"
     }
     helm = {
-      source = "hashicorp/helm"
-      version = "~> 3.2.0"
+      source  = "hashicorp/helm"
+      version = "~> 3.0"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
@@ -34,24 +34,24 @@ provider "aws" {
 }
 
 provider "helm" {
-  kubernetes {
-    host = module.eks.cluster_endpoint
+  kubernetes = {
+    host                   = module.eks.cluster_endpoint
     cluster_ca_certificate = base64decode(module.eks.cluster_ca_data)
-    exec {
+    exec = {
       api_version = "client.authentication.k8s.io/v1beta1"
-      command = "aws"
-      args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
     }
   }
 }
 
 provider "kubernetes" {
-  host = module.eks.cluster_endpoint
+  host                   = module.eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks.cluster_ca_data)
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
-    command = "aws"
-    args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
   }
 }
 
@@ -81,7 +81,6 @@ module "eks" {
 
   project_name = var.project_name
   environment  = var.environment
-  vpc_id       = module.vpc.vpc_id
   subnet_ids   = module.vpc.private_subnet_ids
 
   additional_security_group_ids = [module.security_groups.eks_sg_id]
@@ -108,6 +107,12 @@ module "eks" {
   app_ng_desired_size   = var.eks_app_ng_desired_size
   app_ng_min_size       = var.eks_app_ng_min_size
   app_ng_max_size       = var.eks_app_ng_max_size
+
+  # IAM ARN
+  cluster_role_arn = module.iam.cluster_role_arn
+  node_role_arn    = module.iam.node_role_arn
+  vpc_cni_role_arn = module.iam.vpc_cni_role_arn
+  ebs_csi_role_arn = module.iam.ebs_csi_role_arn
 
   access_entries = var.eks_access_entries
 }
