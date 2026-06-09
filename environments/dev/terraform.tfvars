@@ -21,5 +21,5 @@ db_username = "ccadmin"
 # CI: GitHub Secret 이름을 DB_PASSWORD 로 (컨버터가 TF_VAR_ 접두사 + 소문자화 → TF_VAR_db_password)
 # 로컬: export TF_VAR_db_password=...
 
-public_bucket                 = "einsof-service-625368338405-ap-northeast-2-an"
+public_bucket             = "einsof-service-625368338405-ap-northeast-2-an"
 public_bucket_domain_name = "einsof-service-625368338405-ap-northeast-2-an.s3.ap-northeast-2.amazonaws.com"

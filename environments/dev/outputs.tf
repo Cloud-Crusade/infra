@@ -12,3 +12,8 @@ output "project_name" {
   description = "프로젝트 이름"
   value       = var.project_name
 }
+
+output "bastion_public_ip" {
+  description = "Bastion 퍼블릭 IP"
+  value       = aws_instance.bastion.public_ip
+}

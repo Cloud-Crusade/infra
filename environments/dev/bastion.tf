@@ -34,8 +34,3 @@ resource "aws_s3_object" "bastion_private_key" {
   content      = tls_private_key.bastion.private_key_pem
   content_type = "application/x-pem-file"
 }
-
-output "bastion_public_ip" {
-  description = "Bastion 퍼블릭 IP"
-  value       = aws_instance.bastion.public_ip
-}
