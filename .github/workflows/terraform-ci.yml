@@ -1,20 +1,27 @@
-name: Terraform Validate
+name: Terraform Check
 
 on:
   pull_request:
     branches: ["**"]
     types: [opened, synchronize, reopened]
 
-# PR 단계에서는 공유 dev/prod state 와 비교(plan)하지 않는다.
-# dev 에서는 wiring 작업 중인 브랜치 구성을 직접 apply 해 테스트하므로, state 에는
-# main 에 아직 없는 리소스가 정상적으로 떠 있다. 이를 plan 으로 비교하면 'not in
-# configuration' 대량 destroy + 의존성 cycle 로 PR 이 깨진다.
-# → PR 은 설정 정합성만 검증하고, 실제 plan/apply/destroy 는
-#   terraform-cd.yml(workflow_dispatch)에서 수행한다.
+# PR 단계에서는 공유 dev/prod state 와 비교(일반 plan)하지 않는다.
+# dev 에서는 wiring 작업 브랜치를 직접 apply 해 테스트하므로 state 에 main 에 없는
+# 리소스가 정상적으로 떠 있고, 이를 plan 으로 비교하면 'not in configuration' 대량
+# destroy + 의존성 cycle 로 PR 이 깨진다.
+#
+# 대신 '빈 로컬 state' 로 clean-room plan 을 수행한다:
+#  - 공유 원격 state 에 접근하지 않고 전부 create 로만 계획되어 destroy/cycle 이 없다.
+#  - apply 와 동일하게(-input=false) 변수를 해석하므로, default 없는 required 변수의
+#    input 누락을 'No value for required variable' 로 PR 단계에서 선검출한다.
+#  - plan 이 구조 검증(validate)까지 포함한다.
+#
+# 실제 plan/apply/destroy 는 terraform-cd.yml(workflow_dispatch)에서 수행.
 jobs:
-  terraform-validate:
-    name: Terraform Validate (${{ matrix.environment }})
+  terraform-check:
+    name: Terraform Check (${{ matrix.environment }})
     runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
 
     strategy:
       fail-fast: false
@@ -28,12 +35,39 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      # -backend=false: state(원격 backend) 접근 없이 provider/module 만 설치.
-      # live state 와 비교하지 않으므로 AWS 자격증명·변수 주입이 필요 없다.
-      - name: Terraform Init (no backend)
-        working-directory: environments/${{ matrix.environment }}
-        run: terraform init -backend=false -input=false
+      # 빈 state plan 이라도 data source(예: aws_ami) 평가에 자격증명이 필요.
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
 
-      - name: Terraform Validate
+      # GitHub secrets/variables → TF_VAR_<소문자키> 매핑 (apply 와 동일한 변수 소스).
+      # secrets/vars 로 주입되는 변수까지 포함해 누락 여부를 정확히 판정.
+      - name: Map secrets/variables to TF_VAR_
+        env:
+          SECRETS_CONTEXT: ${{ toJSON(secrets) }}
+          VARS_CONTEXT: ${{ toJSON(vars) }}
+        run: |
+          to_tfvars() {
+            jq -r 'to_entries[]
+              | "TF_VAR_\(.key | ascii_downcase)<<__TFVAR_EOF__\n\(.value)\n__TFVAR_EOF__"'
+          }
+          printf '%s' "$SECRETS_CONTEXT" | to_tfvars >> "$GITHUB_ENV"
+          printf '%s' "$VARS_CONTEXT" | to_tfvars >> "$GITHUB_ENV"
+
+      # 공유 원격 state 격리: backend 설정을 제거해 빈 로컬 state 를 쓰게 한다.
+      - name: Isolate backend (clean-room)
         working-directory: environments/${{ matrix.environment }}
-        run: terraform validate -no-color
+        run: rm -f backend.tf
+
+      - name: Terraform Init (local empty state)
+        working-directory: environments/${{ matrix.environment }}
+        run: terraform init -input=false
+
+      # -input=false: required 변수 값이 없으면 즉시 실패(apply 시 확정 에러를 선검출).
+      # 빈 state 라 전부 create 로만 계획 → destroy/cycle 없음, 공유 state 미접근.
+      - name: Terraform Plan (clean-room)
+        working-directory: environments/${{ matrix.environment }}
+        run: terraform plan -input=false -no-color
