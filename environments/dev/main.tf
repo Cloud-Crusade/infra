@@ -148,6 +148,10 @@ module "apigateway" {
 
   authorizer_lambda_invoke_arn    = module.lambda.invoke_arns["authorizer"]
   authorizer_lambda_function_name = module.lambda.function_names["authorizer"]
+
+  # 커스텀 도메인 (api.<domain>) — REGIONAL + ACM(DNS 검증, 기존 존 사용)
+  api_domain_name = "api.${var.domain_name}"
+  route53_zone_id = var.route53_zone_id
 }
 
 # ElastiCache (Redis/Valkey) — 서브넷그룹은 모듈 내부 생성, SG 는 security_group 모듈
@@ -176,7 +180,7 @@ module "elasticache" {
 }
 
 # Route53 레코드 — www → CloudFront(클라이언트), api → ALB(서버)
-# 호스팅 영역은 기존 존 참조(route53_zone_id). api 라우팅 대상 DNS/zone 은 EKS ingress 등 외부 생성분을 변수로 주입.
+# 호스팅 영역은 기존 존 참조(route53_zone_id). api 는 apigateway 커스텀 도메인(REGIONAL) 출력으로 연결.
 module "route53" {
   source = "../../modules/route53"
 
@@ -187,7 +191,7 @@ module "route53" {
   cloudfront_domain_name = module.cloudfront.cloudfront_domain_name
   cloudfront_zone_id     = var.cloudfront_zone_id
 
-  # api → 트래픽 라우팅 대상(ALB 등, 서버)
-  api_target_dns_name = var.api_target_dns_name
-  api_target_zone_id  = var.api_target_zone_id
+  # api → API Gateway 커스텀 도메인 (REGIONAL)
+  api_target_dns_name = module.apigateway.domain_regional_target
+  api_target_zone_id  = module.apigateway.domain_regional_zone_id
 }

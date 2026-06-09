@@ -151,17 +151,6 @@ variable "route53_zone_id" {
   type        = string
 }
 
-variable "api_target_dns_name" {
-  description = "api 레코드가 가리킬 트래픽 라우팅 대상(ALB/EKS ingress 등)의 DNS Name"
-  type        = string
-}
-
-variable "api_target_zone_id" {
-  description = "api 라우팅 대상의 호스팅 zone ID (서울 리전 ALB 고정값)"
-  type        = string
-  default     = "Z3F1SLL3L0ST3L"
-}
-
 variable "cloudfront_zone_id" {
   description = "CloudFront 배포 zone ID (전 세계 고정값)"
   type        = string

@@ -4,6 +4,11 @@ locals {
 
 resource "aws_api_gateway_rest_api" "this" {
   name = "${local.name}-rest-api"
+
+  # 단일 리전 백엔드 + 같은 리전 ACM 사용 → REGIONAL (EDGE 의 us-east-1 인증서·이중 CloudFront 회피)
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
 }
 
 # 예약 토큰(Reservation) RS256 서명 검증 Lambda authorizer
@@ -194,4 +199,53 @@ resource "aws_lambda_permission" "authorizer" {
   function_name = var.authorizer_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/authorizers/${aws_api_gateway_authorizer.reservation.id}"
+}
+
+# ===== 커스텀 도메인 (api.<domain>) — REGIONAL + ACM(DNS 검증) =====
+resource "aws_acm_certificate" "api" {
+  domain_name       = var.api_domain_name
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ACM DNS 검증 레코드 — 기존 호스팅 영역에 생성
+resource "aws_route53_record" "api_cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.api.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      type   = dvo.resource_record_type
+      record = dvo.resource_record_value
+    }
+  }
+
+  zone_id         = var.route53_zone_id
+  name            = each.value.name
+  type            = each.value.type
+  records         = [each.value.record]
+  ttl             = 60
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "api" {
+  certificate_arn         = aws_acm_certificate.api.arn
+  validation_record_fqdns = [for r in aws_route53_record.api_cert_validation : r.fqdn]
+}
+
+resource "aws_api_gateway_domain_name" "api" {
+  domain_name              = var.api_domain_name
+  regional_certificate_arn = aws_acm_certificate_validation.api.certificate_arn
+
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+}
+
+# 커스텀 도메인 → 스테이지 매핑 (api.<domain>/ → stage 루트)
+resource "aws_api_gateway_base_path_mapping" "api" {
+  api_id      = aws_api_gateway_rest_api.this.id
+  stage_name  = aws_api_gateway_stage.this.stage_name
+  domain_name = aws_api_gateway_domain_name.api.domain_name
 }
