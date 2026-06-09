@@ -134,36 +134,20 @@ resource "aws_instance" "test_service" {
   iam_instance_profile        = aws_iam_instance_profile.test_ec2.name
   key_name                    = aws_key_pair.bastion.key_name
 
-  # docker 설치 → ECR 로그인 → 이미지 pull → run
-  user_data = <<-EOF
-    #!/bin/bash
-    set -euxo pipefail
-    dnf install -y docker
-    systemctl enable --now docker
-
-    IMAGE="${var.test_service_image}"
-    REGISTRY=$(echo "$IMAGE" | cut -d/ -f1)
-    aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin "$REGISTRY"
-    docker pull "$IMAGE"
-
-    cat > /opt/app.env <<'ENVEOF'
-ENV=production
-CORS_ALLOW_ORIGINS=["*"]
-CORE_WRITER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_endpoint}/${var.db_name}
-CORE_READER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_endpoint}/${var.db_name}
-RESERVATION_WRITER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_endpoint}/${var.db_name}
-RESERVATION_READER_URL=postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_replica_endpoint}/${var.db_name}
-REDIS_URL=redis://${module.elasticache.main_cache_endpoint}:6379/0
-JWT_SECRET=${random_password.authorization.result}
-JWT_ACCESS_TTL_SECONDS=1800
-JWT_REFRESH_TTL_SECONDS=1209600
-AWS_REGION=${var.aws_region}
-SQS_RESERVATION_QUEUE_URL=${module.sqs.queue_url}
-SEAT_HOLD_TTL_SECONDS=300
-ENVEOF
-
-    docker run -d --restart always -p ${var.test_service_port}:${var.test_service_port} -v /opt/app.env:/app/.env:ro "$IMAGE"
-  EOF
+  # docker 설치 → ECR 로그인 → 이미지 pull → run (.env 마운트)
+  # 별도 템플릿 사용: HCL heredoc 들여쓰기로 shebang 이 깨져 cloud-init 미실행되던 문제 방지
+  user_data = templatefile("${path.module}/templates/test_ec2_user_data.sh.tftpl", {
+    region                 = var.aws_region
+    image                  = var.test_service_image
+    port                   = var.test_service_port
+    core_writer_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_endpoint}/${var.db_name}"
+    core_reader_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_endpoint}/${var.db_name}"
+    reservation_writer_url = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_endpoint}/${var.db_name}"
+    reservation_reader_url = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_replica_endpoint}/${var.db_name}"
+    redis_url              = "redis://${module.elasticache.main_cache_endpoint}:6379/0"
+    jwt_secret             = random_password.authorization.result
+    sqs_queue_url          = module.sqs.queue_url
+  })
 
   tags = {
     Name = "${var.project_name}-${var.environment}-test-service"
