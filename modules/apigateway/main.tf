@@ -140,22 +140,36 @@ resource "aws_api_gateway_deployment" "this" {
 
   triggers = {
     redeployment = sha1(jsonencode([
-      aws_api_gateway_method.reservations,
-      aws_api_gateway_integration.reservations,
-      aws_api_gateway_method.reservation_item,
-      aws_api_gateway_integration.reservation_item,
-      aws_api_gateway_method.queue,
-      aws_api_gateway_integration.queue,
-      aws_api_gateway_method.proxy,
-      aws_api_gateway_integration.proxy,
-      aws_api_gateway_authorizer.reservation,
-      aws_api_gateway_gateway_response.unauthorized,
+      aws_api_gateway_method.reservations.id,
+      aws_api_gateway_integration.reservations.id,
+      aws_api_gateway_method.reservation_item.id,
+      aws_api_gateway_integration.reservation_item.id,
+      aws_api_gateway_method.queue.id,
+      aws_api_gateway_integration.queue.id,
+      aws_api_gateway_method.proxy.id,
+      aws_api_gateway_integration.proxy.id,
+      aws_api_gateway_authorizer.reservation.id,
+      aws_api_gateway_gateway_response.unauthorized.id,
+      aws_api_gateway_gateway_response.unauthorized.status_code,
     ]))
   }
 
   lifecycle {
     create_before_destroy = true
   }
+
+  depends_on = [
+    aws_api_gateway_method.reservations,
+    aws_api_gateway_integration.reservations,
+    aws_api_gateway_method.reservation_item,
+    aws_api_gateway_integration.reservation_item,
+    aws_api_gateway_method.queue,
+    aws_api_gateway_integration.queue,
+    aws_api_gateway_method.proxy,
+    aws_api_gateway_integration.proxy,
+    aws_api_gateway_authorizer.reservation,
+    aws_api_gateway_gateway_response.unauthorized
+  ]
 }
 
 resource "aws_api_gateway_stage" "this" {
