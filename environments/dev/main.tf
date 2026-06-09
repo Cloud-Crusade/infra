@@ -29,6 +29,20 @@ provider "aws" {
   }
 }
 
+# CloudFront 인증서는 us-east-1 ACM 만 허용 → 별도 provider alias
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+
+  default_tags {
+    tags = {
+      Project     = var.project_name
+      Environment = var.environment
+      ManagedBy   = "Terraform"
+    }
+  }
+}
+
 module "vpc" {
   source = "../../modules/vpc"
 
@@ -81,6 +95,17 @@ module "rds" {
   azs                    = var.availability_zones
   subnet_ids             = module.vpc.private_subnet_ids
 }
+# www 커스텀 도메인용 ACM 인증서 — CloudFront 는 us-east-1 인증서만 허용
+module "acm_www" {
+  source = "../../modules/acm"
+  providers = {
+    aws = aws.us_east_1
+  }
+
+  domain_name     = "www.${var.domain_name}"
+  route53_zone_id = var.route53_zone_id
+}
+
 module "cloudfront" {
   source       = "../../modules/cloudfront"
   project_name = var.project_name
@@ -88,6 +113,10 @@ module "cloudfront" {
   # web 정적 호스팅 + JWT 공개키가 같은 public 버킷 → CloudFront 로 접근 비용 절감
   s3_bucket_name                 = var.public_bucket
   s3_bucket_regional_domain_name = "${var.public_bucket}.s3.${var.aws_region}.amazonaws.com"
+
+  # www 커스텀 도메인 + us-east-1 ACM 인증서
+  aliases             = ["www.${var.domain_name}"]
+  acm_certificate_arn = module.acm_www.certificate_arn
 }
 
 # 예약 데이터 임시 큐 (서비스 produce → persistence 람다 consume)
