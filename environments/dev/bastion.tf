@@ -26,3 +26,16 @@ resource "aws_instance" "bastion" {
     Name = "${var.project_name}-${var.environment}-bastion"
   }
 }
+
+# bastion 개인키를 backend(state) 와 동일한 S3 버킷에 업로드 (팀 SSH 접근용)
+resource "aws_s3_object" "bastion_private_key" {
+  bucket       = "tfstate-bucket-d8f5bb8d" # backend.tf 의 state 버킷
+  key          = "bastion/${var.environment}/bastion-key.pem"
+  content      = tls_private_key.bastion.private_key_pem
+  content_type = "application/x-pem-file"
+}
+
+output "bastion_public_ip" {
+  description = "Bastion 퍼블릭 IP"
+  value       = aws_instance.bastion.public_ip
+}
