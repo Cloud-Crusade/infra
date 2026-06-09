@@ -21,6 +21,12 @@ variable "test_ec2_instance_type" {
   default     = "t3.small"
 }
 
+variable "test_ec2_root_volume_gb" {
+  description = "테스트 EC2 루트 EBS 볼륨 크기(GB) — 서비스 이미지 추출에 충분해야 함"
+  type        = number
+  default     = 30
+}
+
 variable "test_service_ingress_cidrs" {
   description = "서비스 포트 인바운드 허용 CIDR (테스트 편의상 기본 전체 — 운영 금지)"
   type        = list(string)
@@ -133,6 +139,12 @@ resource "aws_instance" "test_service" {
   vpc_security_group_ids      = [aws_security_group.test_ec2.id]
   iam_instance_profile        = aws_iam_instance_profile.test_ec2.name
   key_name                    = aws_key_pair.bastion.key_name
+
+  # 기본 8GB 로는 서비스 이미지(uv 캐시 등) 추출 시 디스크 부족 → 루트 볼륨 확대
+  root_block_device {
+    volume_size = var.test_ec2_root_volume_gb
+    volume_type = "gp3"
+  }
 
   # docker 설치 → ECR 로그인 → 이미지 pull → run (.env 마운트)
   # 별도 템플릿 사용: HCL heredoc 들여쓰기로 shebang 이 깨져 cloud-init 미실행되던 문제 방지
