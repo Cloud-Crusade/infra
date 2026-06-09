@@ -4,6 +4,6 @@ output "www_record_fqdn" {
 }
 
 output "api_record_fqdn" {
-  description = "api 레코드 FQDN (ALB 매핑)"
+  description = "api 레코드 FQDN (트래픽 라우팅 대상 매핑)"
   value       = aws_route53_record.api.fqdn
 }

@@ -8,15 +8,14 @@ variable "route53_zone_id" {
   description = "Route 53 호스팅 영역 ID"
 }
 
-variable "alb_dns_name" {
+variable "api_target_dns_name" {
   type        = string
-  description = "연결할 ALB의 DNS Name"
+  description = "api 레코드가 가리킬 트래픽 라우팅 대상(ALB 등)의 DNS Name"
 }
 
-variable "alb_zone_id" {
+variable "api_target_zone_id" {
   type        = string
-  description = "ALB가 생성된 리전의 Zone ID (참고: 서울 리전 고정값 Z3F1SLL3L0ST3L)"
-
+  description = "api 라우팅 대상의 호스팅 Zone ID (예: 서울 리전 ALB 고정값 Z3F1SLL3L0ST3L)"
 }
 
 variable "cloudfront_domain_name" {

@@ -176,7 +176,7 @@ module "elasticache" {
 }
 
 # Route53 레코드 — www → CloudFront(클라이언트), api → ALB(서버)
-# 호스팅 영역은 기존 존 참조(route53_zone_id). ALB DNS/zone 은 EKS ingress 등 외부 생성분을 변수로 주입.
+# 호스팅 영역은 기존 존 참조(route53_zone_id). api 라우팅 대상 DNS/zone 은 EKS ingress 등 외부 생성분을 변수로 주입.
 module "route53" {
   source = "../../modules/route53"
 
@@ -187,7 +187,7 @@ module "route53" {
   cloudfront_domain_name = module.cloudfront.cloudfront_domain_name
   cloudfront_zone_id     = var.cloudfront_zone_id
 
-  # api → ALB (서버)
-  alb_dns_name = var.alb_dns_name
-  alb_zone_id  = var.alb_zone_id
+  # api → 트래픽 라우팅 대상(ALB 등, 서버)
+  api_target_dns_name = var.api_target_dns_name
+  api_target_zone_id  = var.api_target_zone_id
 }

@@ -24,6 +24,6 @@ output "www_domain" {
 }
 
 output "api_domain" {
-  description = "api 도메인 (ALB 매핑)"
+  description = "api 도메인 (트래픽 라우팅 대상 매핑)"
   value       = module.route53.api_record_fqdn
 }
