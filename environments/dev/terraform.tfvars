@@ -23,3 +23,11 @@ db_username = "ccadmin"
 
 public_bucket             = "einsof-service-625368338405-ap-northeast-2-an"
 public_bucket_domain_name = "einsof-service-625368338405-ap-northeast-2-an.s3.ap-northeast-2.amazonaws.com"
+
+# ===== Route53 / 도메인 =====
+# 실제 도메인과 기존 hosted zone ID 로 교체하세요.
+domain_name     = "einsof.app"
+route53_zone_id = "" # TODO: 기존 호스팅 영역 ID (예: Z0123456789ABCDEFGHIJ)
+# api 레코드가 가리킬 ALB(서버) DNS. EKS ingress 로 생성된 ALB DNS 로 교체.
+alb_dns_name = "" # TODO: 예) k8s-...elb.ap-northeast-2.amazonaws.com
+# alb_zone_id / cloudfront_zone_id 는 기본값(서울 ALB / 전역 CloudFront) 사용

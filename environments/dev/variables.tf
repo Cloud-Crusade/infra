@@ -138,3 +138,32 @@ variable "public_bucket_domain_name" {
   description = "공개 접근 S3 버킷의 리전별 도메인 이름 (예: my-bucket.s3.ap-northeast-2.amazonaws.com)"
   type        = string
 }
+
+# ===== Route53 / 도메인 =====
+
+variable "domain_name" {
+  description = "기본 도메인 이름 (예: einsof.app)"
+  type        = string
+}
+
+variable "route53_zone_id" {
+  description = "기존 Route53 호스팅 영역 ID (도메인 등록 시 생성된 존을 참조)"
+  type        = string
+}
+
+variable "alb_dns_name" {
+  description = "api 레코드가 가리킬 ALB(서버, EKS ingress 등)의 DNS Name"
+  type        = string
+}
+
+variable "alb_zone_id" {
+  description = "ALB 의 호스팅 zone ID (서울 리전 ALB 고정값)"
+  type        = string
+  default     = "Z3F1SLL3L0ST3L"
+}
+
+variable "cloudfront_zone_id" {
+  description = "CloudFront 배포 zone ID (전 세계 고정값)"
+  type        = string
+  default     = "Z2FDTNDATAQYW2"
+}

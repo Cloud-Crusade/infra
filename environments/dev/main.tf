@@ -174,3 +174,20 @@ module "elasticache" {
   waiting_room_num_clusters           = 1
   waiting_room_sg_id                  = module.security_groups.cache_sg_id
 }
+
+# Route53 레코드 — www → CloudFront(클라이언트), api → ALB(서버)
+# 호스팅 영역은 기존 존 참조(route53_zone_id). ALB DNS/zone 은 EKS ingress 등 외부 생성분을 변수로 주입.
+module "route53" {
+  source = "../../modules/route53"
+
+  domain_name     = var.domain_name
+  route53_zone_id = var.route53_zone_id
+
+  # www → CloudFront (클라이언트 정적 호스팅)
+  cloudfront_domain_name = module.cloudfront.cloudfront_domain_name
+  cloudfront_zone_id     = var.cloudfront_zone_id
+
+  # api → ALB (서버)
+  alb_dns_name = var.alb_dns_name
+  alb_zone_id  = var.alb_zone_id
+}
