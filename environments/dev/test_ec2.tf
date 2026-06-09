@@ -126,9 +126,9 @@ resource "aws_instance" "test_service" {
   instance_type               = var.test_ec2_instance_type
   subnet_id                   = module.vpc.public_subnet_ids[0]
   associate_public_ip_address = true
-  vpc_security_group_ids = [aws_security_group.test_ec2.id, module.security_groups.eks_sg_id]
-  iam_instance_profile   = aws_iam_instance_profile.test_ec2.name
-  key_name               = aws_key_pair.bastion.key_name
+  vpc_security_group_ids      = [aws_security_group.test_ec2.id, module.security_groups.eks_sg_id]
+  iam_instance_profile        = aws_iam_instance_profile.test_ec2.name
+  key_name                    = aws_key_pair.bastion.key_name
 
   # 기본 8GB 로는 서비스 이미지(uv 캐시 등) 추출 시 디스크 부족 → 루트 볼륨 확대
   root_block_device {
