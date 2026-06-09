@@ -1,12 +1,7 @@
-
-resource "aws_route53_record" "cloudfront_domains" {
-  for_each = toset([
-    var.domain_name,          
-    "www.${var.domain_name}"  
-  ])
-
+# 1. www 도메인  -> CloudFront 매핑
+resource "aws_route53_record" "www" {
   zone_id = var.route53_zone_id
-  name    = each.value
+  name    = "www.${var.domain_name}"
   type    = "A"
 
   alias {
@@ -16,7 +11,7 @@ resource "aws_route53_record" "cloudfront_domains" {
   }
 }
 
-# 2. api.einsof.app -> ALB 매핑
+# 2. api 도메인 -> ALB 매핑 
 resource "aws_route53_record" "api" {
   zone_id = var.route53_zone_id
   name    = "api.${var.domain_name}"
@@ -27,4 +22,4 @@ resource "aws_route53_record" "api" {
     zone_id                = var.alb_zone_id
     evaluate_target_health = true
   }
-}
+} 
