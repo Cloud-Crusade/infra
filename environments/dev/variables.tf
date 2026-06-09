@@ -133,3 +133,8 @@ variable "public_bucket" {
   description = "공개 접근 S3 버킷 이름 (web 정적 호스팅 + 공개 리소스 + JWT 공개키, state 버킷과 분리). CloudFront origin 도 이 버킷"
   type        = string
 }
+
+variable "public_bucket_domain_name" {
+  description = "공개 접근 S3 버킷의 리전별 도메인 이름 (예: my-bucket.s3.ap-northeast-2.amazonaws.com)"
+  type        = string
+}
