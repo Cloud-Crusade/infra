@@ -7,6 +7,7 @@ resource "aws_secretsmanager_secret" "authorization_secret" {
   name        = "${var.environment}-authorization-secret"
   description = "JWT 서명용 대칭 시크릿 (HS256)"
 
+  recovery_window_in_days = 0
   tags = {
     Name = "${var.environment}-authorization-secret"
   }
@@ -22,6 +23,7 @@ resource "aws_secretsmanager_secret" "reservation_private_key" {
   name        = "${var.environment}-reservation-private-key"
   description = "JWT 서명용 Private Key"
 
+  recovery_window_in_days = 0
   tags = {
     Name = "${var.environment}-reservation-private-key"
   }
@@ -38,6 +40,7 @@ resource "aws_secretsmanager_secret" "rds_credentials" {
   name        = "${var.environment}-rds-credentials"
   description = "RDS 접속 정보 (username, password)"
 
+  recovery_window_in_days = 0
   tags = {
     Name = "${var.environment}-rds-credentials"
   }
@@ -57,6 +60,7 @@ resource "aws_secretsmanager_secret" "core_rds_writer_endpoint" {
   name        = "${var.environment}-core-rds-writer-endpoint"
   description = "메인(core) RDS Writer 엔드포인트 (AZ 장애 시 동적 전환용)"
 
+  recovery_window_in_days = 0
   tags = {
     Name = "${var.environment}-core-rds-writer-endpoint"
   }
@@ -71,6 +75,7 @@ resource "aws_secretsmanager_secret" "reservation_rds_writer_endpoint" {
   name        = "${var.environment}-reservation-rds-writer-endpoint"
   description = "예약(reservation) RDS Writer 엔드포인트 (AZ 장애 시 동적 전환용)"
 
+  recovery_window_in_days = 0
   tags = {
     Name = "${var.environment}-reservation-rds-writer-endpoint"
   }
