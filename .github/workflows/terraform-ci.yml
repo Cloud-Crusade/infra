@@ -5,18 +5,6 @@ on:
     branches: ["**"]
     types: [opened, synchronize, reopened]
 
-# PR 단계에서는 공유 dev/prod state 와 비교(일반 plan)하지 않는다.
-# dev 에서는 wiring 작업 브랜치를 직접 apply 해 테스트하므로 state 에 main 에 없는
-# 리소스가 정상적으로 떠 있고, 이를 plan 으로 비교하면 'not in configuration' 대량
-# destroy + 의존성 cycle 로 PR 이 깨진다.
-#
-# 대신 '빈 로컬 state' 로 clean-room plan 을 수행한다:
-#  - 공유 원격 state 에 접근하지 않고 전부 create 로만 계획되어 destroy/cycle 이 없다.
-#  - apply 와 동일하게(-input=false) 변수를 해석하므로, default 없는 required 변수의
-#    input 누락을 'No value for required variable' 로 PR 단계에서 선검출한다.
-#  - plan 이 구조 검증(validate)까지 포함한다.
-#
-# 실제 plan/apply/destroy 는 terraform-cd.yml(workflow_dispatch)에서 수행.
 jobs:
   terraform-check:
     name: Terraform Check (${{ matrix.environment }})
