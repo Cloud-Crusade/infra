@@ -121,24 +121,14 @@ resource "aws_security_group" "test_ec2" {
   }
 }
 
-# 테스트 EC2 → RDS 5432 허용 (rds SG 는 기본적으로 bastion 만 허용)
-resource "aws_security_group_rule" "rds_from_test_ec2" {
-  type                     = "ingress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  security_group_id        = module.security_groups.rds_sg_id
-  source_security_group_id = aws_security_group.test_ec2.id
-}
-
 resource "aws_instance" "test_service" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = var.test_ec2_instance_type
   subnet_id                   = module.vpc.public_subnet_ids[0]
   associate_public_ip_address = true
-  vpc_security_group_ids      = [aws_security_group.test_ec2.id]
-  iam_instance_profile        = aws_iam_instance_profile.test_ec2.name
-  key_name                    = aws_key_pair.bastion.key_name
+  vpc_security_group_ids = [aws_security_group.test_ec2.id, module.security_groups.eks_sg_id]
+  iam_instance_profile   = aws_iam_instance_profile.test_ec2.name
+  key_name               = aws_key_pair.bastion.key_name
 
   # 기본 8GB 로는 서비스 이미지(uv 캐시 등) 추출 시 디스크 부족 → 루트 볼륨 확대
   root_block_device {

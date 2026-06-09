@@ -31,7 +31,7 @@ resource "aws_security_group" "rds" {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [aws_security_group.bastion.id, aws_security_group.lambda.id]
+    security_groups = [aws_security_group.bastion.id, aws_security_group.lambda.id, aws_security_group.eks.id]
   }
 
   # 전 포트 허용(protocol -1)하되 목적지는 VPC 내부로만 한정
