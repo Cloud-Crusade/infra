@@ -21,5 +21,14 @@ db_username = "ccadmin"
 # CI: GitHub Secret 이름을 DB_PASSWORD 로 (컨버터가 TF_VAR_ 접두사 + 소문자화 → TF_VAR_db_password)
 # 로컬: export TF_VAR_db_password=...
 
-s3_bucket_name                 = "einsof-service-625368338405-ap-northeast-2-an"
-s3_bucket_regional_domain_name = "einsof-service-625368338405-ap-northeast-2-an.s3.ap-northeast-2.amazonaws.com"
+public_bucket             = "einsof-service-625368338405-ap-northeast-2-an"
+public_bucket_domain_name = "einsof-service-625368338405-ap-northeast-2-an.s3.ap-northeast-2.amazonaws.com"
+
+# ===== Route53 / 도메인 =====
+# domain_name·route53_zone_id 는 tfvars 에 적지 않는다 — tfvars 값이 TF_VAR_ 환경변수보다
+# 우선해 덮어쓰기 때문(빈 문자열도 우선). 환경별 값이므로 TF_VAR_ 로만 주입한다.
+# CI: GitHub Secret/Variable 이름을 DOMAIN_NAME / ROUTE53_ZONE_ID 로
+#     (컨버터가 TF_VAR_ 접두사 + 소문자화 → TF_VAR_domain_name / TF_VAR_route53_zone_id)
+# 로컬: export TF_VAR_domain_name=... TF_VAR_route53_zone_id=...
+# api 레코드는 API Gateway 커스텀 도메인(apigateway 모듈, REGIONAL)에 자동 연결 — 별도 대상 입력 불필요
+# cloudfront_zone_id 는 기본값(전역 CloudFront) 사용

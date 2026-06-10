@@ -154,6 +154,27 @@ resource "aws_iam_policy" "lambda_secrets" {
   })
 }
 
+# SQS 소비 권한 (persistence 람다 event source mapping)
+resource "aws_iam_policy" "lambda_sqs" {
+  name        = "${var.project_name}-lambda-sqs-policy"
+  description = "Lambda SQS consume (event source mapping)"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # ElastiCache 접근 권한
 resource "aws_iam_policy" "eks_elasticache" {
   name        = "${var.project_name}-eks-elasticache-policy"
@@ -214,6 +235,17 @@ resource "aws_iam_role_policy_attachment" "lambda_logging" {
 
 resource "aws_iam_role_policy_attachment" "lambda_secrets" {
   policy_arn = aws_iam_policy.lambda_secrets.arn
+  role       = aws_iam_role.lambda.name
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_sqs" {
+  policy_arn = aws_iam_policy.lambda_sqs.arn
+  role       = aws_iam_role.lambda.name
+}
+
+# VPC 연결 람다용 ENI 권한 (ElastiCache/RDS 등 VPC 내부 접근 시)
+resource "aws_iam_role_policy_attachment" "lambda_vpc" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
   role       = aws_iam_role.lambda.name
 }
 

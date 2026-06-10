@@ -1,7 +1,12 @@
-# 기존 네트워크 및 인프라 연동 변수 
+# 기존 네트워크 및 인프라 연동 변수
 variable "subnet_group_name" {
   type        = string
-  description = "VPC ElastiCache 서브넷 그룹 이름"
+  description = "모듈이 생성할 ElastiCache 서브넷 그룹 이름"
+}
+
+variable "subnet_ids" {
+  type        = list(string)
+  description = "서브넷 그룹에 포함할 프라이빗 서브넷 ID 목록"
 }
 
 variable "main_cache_sg_id" {
