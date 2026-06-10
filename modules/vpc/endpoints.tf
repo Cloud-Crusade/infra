@@ -5,17 +5,10 @@ data "aws_region" "current" {}
 resource "aws_security_group" "secretsmanager_endpoint" {
   count       = var.enable_secretsmanager_endpoint ? 1 : 0
   name        = "${var.project_name}-${var.environment}-sm-endpoint-sg"
-  description = "Secrets Manager VPC endpoint - HTTPS from VPC"
+  description = "Secrets Manager VPC endpoint - inbound 443 from allowed SGs"
   vpc_id      = aws_vpc.this.id
 
-  ingress {
-    description = "HTTPS from VPC (private Lambda 등)"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = [aws_vpc.this.cidr_block]
-  }
-
+  # 인바운드(443)는 실제 SM 접근이 필요한 SG 만 허용 — 규칙은 외부(상위 구성)에서 부여(최소권한, 모듈 순환 회피)
   tags = {
     Name = "${var.project_name}-${var.environment}-sm-endpoint-sg"
   }
