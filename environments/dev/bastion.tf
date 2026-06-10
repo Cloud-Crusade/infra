@@ -33,4 +33,6 @@ resource "aws_s3_object" "bastion_private_key" {
   key          = "bastion/${var.environment}/bastion-key.pem"
   content      = tls_private_key.bastion.private_key_pem
   content_type = "application/x-pem-file"
+  # 민감 키 — 객체 단위 SSE 명시(버킷 기본 암호화에 의존하지 않음)
+  server_side_encryption = "AES256"
 }

@@ -76,11 +76,12 @@ resource "aws_security_group" "cache" {
   description = "Security Group for ElastiCache (Redis/Valkey)"
   vpc_id      = var.vpc_id
 
+  # Redis 인바운드는 서비스(lambda/eks) SG 로 제한 — VPC 전체 개방 회피(최소 권한)
   ingress {
-    from_port   = 6379
-    to_port     = 6379
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.lambda.id, aws_security_group.eks.id]
   }
 
   egress {

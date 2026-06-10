@@ -60,6 +60,11 @@ resource "aws_lambda_function" "this" {
       condition     = length(setsubtract(var.vpc_modules, local.modules)) == 0
       error_message = "vpc_modules 에 lambda-modules.txt 에 없는 모듈이 있습니다: ${join(", ", setsubtract(var.vpc_modules, local.modules))}"
     }
+    # vpc_modules 사용 시 서브넷·SG 가 비면 vpc_config 가 빈 값으로 생성돼 apply 가 실패 → 조기 검출
+    precondition {
+      condition     = length(var.vpc_modules) == 0 || (length(var.vpc_subnet_ids) > 0 && length(var.vpc_security_group_ids) > 0)
+      error_message = "vpc_modules 사용 시 vpc_subnet_ids 와 vpc_security_group_ids 가 비어있지 않아야 합니다."
+    }
   }
 }
 
