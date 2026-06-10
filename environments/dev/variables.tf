@@ -156,3 +156,11 @@ variable "cloudfront_zone_id" {
   type        = string
   default     = "Z2FDTNDATAQYW2"
 }
+
+# ===== CAPTCHA =====
+
+variable "captcha_enabled" {
+  description = "예매 캡차(ALTCHA PoW) 활성화 — 앱 CAPTCHA_ENABLED 환경변수로 주입"
+  type        = bool
+  default     = false
+}

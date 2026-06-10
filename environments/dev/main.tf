@@ -73,6 +73,7 @@ module "secrets_manager" {
   rds_password                  = var.db_password
   core_writer_endpoint          = module.rds.primary_endpoint
   reservation_writer_endpoint   = module.rds.reservation_endpoint
+  captcha_hmac_secret_value     = random_password.captcha_hmac.result
 }
 module "iam" {
   source            = "../../modules/iam"

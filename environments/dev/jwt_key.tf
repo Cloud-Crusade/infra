@@ -6,6 +6,12 @@ resource "random_password" "authorization" {
   special = false
 }
 
+# 캡차(ALTCHA PoW) 서명/검증용 HMAC 시크릿 — app/검증측이 동일 시크릿 공유
+resource "random_password" "captcha_hmac" {
+  length  = 64
+  special = false
+}
+
 resource "tls_private_key" "reservation" {
   algorithm = "RSA"
   rsa_bits  = 2048
