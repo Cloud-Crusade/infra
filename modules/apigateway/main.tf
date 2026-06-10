@@ -112,6 +112,35 @@ resource "aws_api_gateway_integration" "queue" {
   uri                     = var.queue_lambda_invoke_arn
 }
 
+# ===== /captcha/challenge → captcha Lambda (ALTCHA PoW 챌린지 발급, 공개) =====
+resource "aws_api_gateway_resource" "captcha" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_rest_api.this.root_resource_id
+  path_part   = "captcha"
+}
+
+resource "aws_api_gateway_resource" "captcha_challenge" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_resource.captcha.id
+  path_part   = "challenge"
+}
+
+resource "aws_api_gateway_method" "captcha_challenge" {
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.captcha_challenge.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "captcha_challenge" {
+  rest_api_id             = aws_api_gateway_rest_api.this.id
+  resource_id             = aws_api_gateway_resource.captcha_challenge.id
+  http_method             = aws_api_gateway_method.captcha_challenge.http_method
+  type                    = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri                     = var.captcha_lambda_invoke_arn
+}
+
 # ===== 그 외 모든 경로(/{proxy+}) → app 백엔드(EKS). Authorization 은 EKS 가 판별 =====
 resource "aws_api_gateway_resource" "proxy" {
   rest_api_id = aws_api_gateway_rest_api.this.id
@@ -151,6 +180,8 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_integration.reservation_item.id,
       aws_api_gateway_method.queue.id,
       aws_api_gateway_integration.queue.id,
+      aws_api_gateway_method.captcha_challenge.id,
+      aws_api_gateway_integration.captcha_challenge.id,
       aws_api_gateway_method.proxy.id,
       aws_api_gateway_integration.proxy.id,
       aws_api_gateway_authorizer.reservation.id,
@@ -170,6 +201,8 @@ resource "aws_api_gateway_deployment" "this" {
     aws_api_gateway_integration.reservation_item,
     aws_api_gateway_method.queue,
     aws_api_gateway_integration.queue,
+    aws_api_gateway_method.captcha_challenge,
+    aws_api_gateway_integration.captcha_challenge,
     aws_api_gateway_method.proxy,
     aws_api_gateway_integration.proxy,
     aws_api_gateway_authorizer.reservation,
@@ -190,6 +223,15 @@ resource "aws_lambda_permission" "queue" {
   function_name = var.queue_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/*/*/queue/*"
+}
+
+# 게이트웨이 → captcha Lambda invoke 권한
+resource "aws_lambda_permission" "captcha" {
+  statement_id  = "AllowApiGatewayInvokeCaptcha"
+  action        = "lambda:InvokeFunction"
+  function_name = var.captcha_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/*/*/captcha/challenge"
 }
 
 # 게이트웨이 → authorizer Lambda invoke 권한
