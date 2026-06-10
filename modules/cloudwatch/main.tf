@@ -130,8 +130,6 @@ resource "aws_cloudwatch_metric_alarm" "lambda_duration" {
 # ===== CloudFront 알람 =====
 
 resource "aws_cloudwatch_metric_alarm" "cloudfront_5xx" {
-  for_each = var.cloudfront_distribution_id != "" ? toset([var.cloudfront_distribution_id]) : toset([])
-
   alarm_name          = "${var.project_name}-${var.environment}-cloudfront-5xx"
   alarm_description   = "CloudFront 5xx 에러율 5% 초과"
   namespace           = "AWS/CloudFront"
@@ -143,7 +141,7 @@ resource "aws_cloudwatch_metric_alarm" "cloudfront_5xx" {
   comparison_operator = "GreaterThanThreshold"
 
   dimensions = {
-    DistributionId = each.key
+    DistributionId = var.cloudfront_distribution_id
     Region         = "Global"
   }
 
@@ -152,8 +150,6 @@ resource "aws_cloudwatch_metric_alarm" "cloudfront_5xx" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "cloudfront_4xx" {
-  for_each = var.cloudfront_distribution_id != "" ? toset([var.cloudfront_distribution_id]) : toset([])
-
   alarm_name          = "${var.project_name}-${var.environment}-cloudfront-4xx"
   alarm_description   = "CloudFront 4xx 에러율 10% 초과"
   namespace           = "AWS/CloudFront"
@@ -165,7 +161,7 @@ resource "aws_cloudwatch_metric_alarm" "cloudfront_4xx" {
   comparison_operator = "GreaterThanThreshold"
 
   dimensions = {
-    DistributionId = each.key
+    DistributionId = var.cloudfront_distribution_id
     Region         = "Global"
   }
 
