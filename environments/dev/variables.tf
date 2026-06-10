@@ -157,6 +157,15 @@ variable "cloudfront_zone_id" {
   default     = "Z2FDTNDATAQYW2"
 }
 
+# ===== CloudWatch =====
+
+variable "alarm_email" {
+  description = "Email address to receive CloudWatch alarm notifications"
+  type        = string
+  default     = ""
+}
+
+
 # AWS Parameters and Secrets Lambda Extension (ap-northeast-2, x86_64)
 # captcha Lambda 가 Secrets Manager 를 런타임 캐시 조회할 때 사용. 버전은 최신 확인 후 갱신
 variable "secrets_extension_layer_arn" {
@@ -172,3 +181,4 @@ variable "captcha_enabled" {
   type        = bool
   default     = false
 }
+

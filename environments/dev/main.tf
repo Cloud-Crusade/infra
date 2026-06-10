@@ -242,3 +242,44 @@ module "route53" {
   api_target_dns_name = module.apigateway.domain_regional_target
   api_target_zone_id  = module.apigateway.domain_regional_zone_id
 }
+module "cloudwatch" {
+  source = "../../modules/cloudwatch"
+
+  project_name = var.project_name
+  environment  = var.environment
+  alarm_email  = var.alarm_email
+
+  # RDS
+  rds_instance_ids = [
+    "${var.project_name}-${var.environment}-primary",
+    "${var.project_name}-${var.environment}-primary-replica",
+    "${var.project_name}-${var.environment}-reservation",
+    "${var.project_name}-${var.environment}-reservation-replica",
+    "${var.project_name}-${var.environment}-reservation-replica-2",
+  ]
+
+  # Lambda
+  lambda_function_names = [
+    module.lambda.function_names["authorizer"],
+    module.lambda.function_names["ticketing"],
+    module.lambda.function_names["persistence"],
+  ]
+
+  # CloudFront
+  cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
+
+  # ElastiCache
+  elasticache_cluster_ids = [
+    module.elasticache.main_cache_cluster_id,
+    module.elasticache.waiting_room_cache_cluster_id,
+  ]
+
+  # SQS
+  sqs_queue_names = [module.sqs.queue_name]
+
+  # EKS (틀만 — 모듈 연결 후 활성화)
+  eks_cluster_name = ""
+
+  # API Gateway (틀만 — 모듈 연결 후 활성화)
+  api_gateway_name = ""
+}
