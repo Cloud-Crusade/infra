@@ -162,6 +162,8 @@ module "lambda" {
     # S3 직접 접근 대신 CloudFront URL → S3 IAM 불필요 + 접근 비용 절감
     authorizer = {
       PUBLIC_KEY_URL = "https://${module.cloudfront.cloudfront_domain_name}/jwt/${var.environment}/reservation/public_key.pem"
+      # Authorization 대칭키(HS256) — 값이 아닌 이름만, 런타임에 Secrets 확장 캐시로 조회
+      AUTHORIZATION_SECRET_ARN = "${var.environment}-authorization-secret"
     }
     # captcha — HMAC 시크릿은 값이 아닌 이름만 주입, 런타임에 Secrets 확장 캐시로 조회
     captcha = {
@@ -169,9 +171,10 @@ module "lambda" {
     }
   }
 
-  # captcha 만 Secrets Manager 확장 레이어 부착 — 시크릿 캐시 조회(호출 수·비용 절감)
+  # Secrets Manager 를 런타임 조회하는 Lambda 에 확장 레이어 부착 — 시크릿 캐시(호출 수·비용 절감)
   layers = {
-    captcha = [var.secrets_extension_layer_arn]
+    captcha    = [var.secrets_extension_layer_arn]
+    authorizer = [var.secrets_extension_layer_arn]
   }
 }
 
