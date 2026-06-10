@@ -185,8 +185,10 @@ module "apigateway" {
   queue_lambda_invoke_arn    = module.lambda.invoke_arns["ticketing"]
   queue_lambda_function_name = module.lambda.function_names["ticketing"]
 
-  captcha_lambda_invoke_arn    = module.lambda.invoke_arns["captcha"]
-  captcha_lambda_function_name = module.lambda.function_names["captcha"]
+  # captcha Lambda 가 배포(lambda-modules.txt 등록)됐을 때만 라우트 생성 — 미배포 시 plan 실패 방지
+  enable_captcha_route         = contains(keys(module.lambda.function_names), "captcha")
+  captcha_lambda_invoke_arn    = lookup(module.lambda.invoke_arns, "captcha", "")
+  captcha_lambda_function_name = lookup(module.lambda.function_names, "captcha", "")
 
   authorizer_lambda_invoke_arn    = module.lambda.invoke_arns["authorizer"]
   authorizer_lambda_function_name = module.lambda.function_names["authorizer"]

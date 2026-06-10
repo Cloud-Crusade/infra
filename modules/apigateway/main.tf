@@ -113,29 +113,34 @@ resource "aws_api_gateway_integration" "queue" {
 }
 
 # ===== /captcha/challenge → captcha Lambda (ALTCHA PoW 챌린지 발급, 공개) =====
+# captcha Lambda 가 아직 배포(lambda-modules.txt 등록)되지 않았을 수 있어 옵션으로 둔다
 resource "aws_api_gateway_resource" "captcha" {
+  count       = var.enable_captcha_route ? 1 : 0
   rest_api_id = aws_api_gateway_rest_api.this.id
   parent_id   = aws_api_gateway_rest_api.this.root_resource_id
   path_part   = "captcha"
 }
 
 resource "aws_api_gateway_resource" "captcha_challenge" {
+  count       = var.enable_captcha_route ? 1 : 0
   rest_api_id = aws_api_gateway_rest_api.this.id
-  parent_id   = aws_api_gateway_resource.captcha.id
+  parent_id   = aws_api_gateway_resource.captcha[0].id
   path_part   = "challenge"
 }
 
 resource "aws_api_gateway_method" "captcha_challenge" {
+  count         = var.enable_captcha_route ? 1 : 0
   rest_api_id   = aws_api_gateway_rest_api.this.id
-  resource_id   = aws_api_gateway_resource.captcha_challenge.id
+  resource_id   = aws_api_gateway_resource.captcha_challenge[0].id
   http_method   = "GET"
   authorization = "NONE"
 }
 
 resource "aws_api_gateway_integration" "captcha_challenge" {
+  count                   = var.enable_captcha_route ? 1 : 0
   rest_api_id             = aws_api_gateway_rest_api.this.id
-  resource_id             = aws_api_gateway_resource.captcha_challenge.id
-  http_method             = aws_api_gateway_method.captcha_challenge.http_method
+  resource_id             = aws_api_gateway_resource.captcha_challenge[0].id
+  http_method             = aws_api_gateway_method.captcha_challenge[0].http_method
   type                    = "AWS_PROXY"
   integration_http_method = "POST"
   uri                     = var.captcha_lambda_invoke_arn
@@ -173,21 +178,22 @@ resource "aws_api_gateway_deployment" "this" {
   rest_api_id = aws_api_gateway_rest_api.this.id
 
   triggers = {
-    redeployment = sha1(jsonencode([
+    redeployment = sha1(jsonencode(concat([
       aws_api_gateway_method.reservations.id,
       aws_api_gateway_integration.reservations.id,
       aws_api_gateway_method.reservation_item.id,
       aws_api_gateway_integration.reservation_item.id,
       aws_api_gateway_method.queue.id,
       aws_api_gateway_integration.queue.id,
-      aws_api_gateway_method.captcha_challenge.id,
-      aws_api_gateway_integration.captcha_challenge.id,
       aws_api_gateway_method.proxy.id,
       aws_api_gateway_integration.proxy.id,
       aws_api_gateway_authorizer.reservation.id,
       aws_api_gateway_gateway_response.unauthorized.id,
       aws_api_gateway_gateway_response.unauthorized.status_code,
-    ]))
+      ], var.enable_captcha_route ? [
+      aws_api_gateway_method.captcha_challenge[0].id,
+      aws_api_gateway_integration.captcha_challenge[0].id,
+    ] : [])))
   }
 
   lifecycle {
@@ -227,6 +233,7 @@ resource "aws_lambda_permission" "queue" {
 
 # 게이트웨이 → captcha Lambda invoke 권한
 resource "aws_lambda_permission" "captcha" {
+  count         = var.enable_captcha_route ? 1 : 0
   statement_id  = "AllowApiGatewayInvokeCaptcha"
   action        = "lambda:InvokeFunction"
   function_name = var.captcha_lambda_function_name
