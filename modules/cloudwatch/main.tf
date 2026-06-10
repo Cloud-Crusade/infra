@@ -426,3 +426,89 @@ resource "aws_cloudwatch_dashboard" "main" {
     ]
   })
 }
+
+# ===== cAdvisor 알람 (틀만 — EKS 설정 후 활성화) =====
+
+resource "aws_cloudwatch_metric_alarm" "cadvisor_cpu" {
+  count = var.cadvisor_eks_cluster_name != "" ? 1 : 0
+
+  alarm_name          = "${var.project_name}-${var.environment}-cadvisor-cpu"
+  alarm_description   = "cAdvisor 컨테이너 CPU 사용률 80% 초과"
+  namespace           = "CWAgent"
+  metric_name         = "container_cpu_usage_seconds_total"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 80
+  comparison_operator = "GreaterThanThreshold"
+
+  dimensions = {
+    ClusterName = var.cadvisor_eks_cluster_name
+  }
+
+  alarm_actions = [aws_sns_topic.alarm.arn]
+  ok_actions    = [aws_sns_topic.alarm.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "cadvisor_memory" {
+  count = var.cadvisor_eks_cluster_name != "" ? 1 : 0
+
+  alarm_name          = "${var.project_name}-${var.environment}-cadvisor-memory"
+  alarm_description   = "cAdvisor 컨테이너 메모리 사용률 80% 초과"
+  namespace           = "CWAgent"
+  metric_name         = "container_memory_usage_bytes"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 80
+  comparison_operator = "GreaterThanThreshold"
+
+  dimensions = {
+    ClusterName = var.cadvisor_eks_cluster_name
+  }
+
+  alarm_actions = [aws_sns_topic.alarm.arn]
+  ok_actions    = [aws_sns_topic.alarm.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "cadvisor_restart" {
+  count = var.cadvisor_eks_cluster_name != "" ? 1 : 0
+
+  alarm_name          = "${var.project_name}-${var.environment}-cadvisor-restart"
+  alarm_description   = "cAdvisor 컨테이너 재시작 횟수 5회 초과"
+  namespace           = "CWAgent"
+  metric_name         = "container_restart_count"
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 5
+  comparison_operator = "GreaterThanThreshold"
+
+  dimensions = {
+    ClusterName = var.cadvisor_eks_cluster_name
+  }
+
+  alarm_actions = [aws_sns_topic.alarm.arn]
+  ok_actions    = [aws_sns_topic.alarm.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "cadvisor_pod_count" {
+  count = var.cadvisor_eks_cluster_name != "" ? 1 : 0
+
+  alarm_name          = "${var.project_name}-${var.environment}-cadvisor-pod-count"
+  alarm_description   = "실행 중인 Pod 수 2개 미만"
+  namespace           = "CWAgent"
+  metric_name         = "container_last_seen"
+  statistic           = "SampleCount"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 2
+  comparison_operator = "LessThanThreshold"
+
+  dimensions = {
+    ClusterName = var.cadvisor_eks_cluster_name
+  }
+
+  alarm_actions = [aws_sns_topic.alarm.arn]
+  ok_actions    = [aws_sns_topic.alarm.arn]
+}

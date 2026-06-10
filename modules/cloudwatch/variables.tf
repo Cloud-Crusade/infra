@@ -73,3 +73,11 @@ variable "api_gateway_name" {
   type        = string
   default     = ""
 }
+
+# ===== cAdvisor  =====
+
+variable "cadvisor_eks_cluster_name" {
+  description = "EKS cluster name running cAdvisor container monitoring (activate after EKS setup)"
+  type        = string
+  default     = ""
+}
