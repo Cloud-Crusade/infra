@@ -85,3 +85,19 @@ resource "aws_secretsmanager_secret_version" "reservation_rds_writer_endpoint" {
   secret_id     = aws_secretsmanager_secret.reservation_rds_writer_endpoint.id
   secret_string = var.reservation_writer_endpoint
 }
+
+# 캡차(ALTCHA PoW) HMAC 시크릿 — app/검증 Lambda 가 동일 시크릿 공유
+resource "aws_secretsmanager_secret" "captcha_hmac_secret" {
+  name        = "${var.environment}-captcha-hmac-secret"
+  description = "캡차(ALTCHA PoW) 서명/검증용 HMAC 시크릿"
+
+  recovery_window_in_days = 0
+  tags = {
+    Name = "${var.environment}-captcha-hmac-secret"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "captcha_hmac_secret" {
+  secret_id     = aws_secretsmanager_secret.captcha_hmac_secret.id
+  secret_string = var.captcha_hmac_secret_value
+}
