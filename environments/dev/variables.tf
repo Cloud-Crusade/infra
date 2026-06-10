@@ -130,20 +130,32 @@ variable "db_allocated_storage" {
 # ===== Public 버킷 =====
 
 variable "public_bucket" {
-  description = "공개 접근 S3 버킷 이름 (client 정적 호스팅·공개 리소스·JWT 공개키 등, state 버킷과 분리)"
+  description = "공개 접근 S3 버킷 이름 (web 정적 호스팅 + 공개 리소스 + JWT 공개키, state 버킷과 분리). CloudFront origin 도 이 버킷"
   type        = string
 }
 
-variable "s3_bucket_name" {
-  description = "CloudFront와 연결할 S3 버킷 이름"
+variable "public_bucket_domain_name" {
+  description = "공개 접근 S3 버킷의 리전별 도메인 이름 (예: my-bucket.s3.ap-northeast-2.amazonaws.com)"
   type        = string
 }
 
-variable "s3_bucket_regional_domain_name" {
-  description = "S3 버킷 리전 도메인 이름"
+# ===== Route53 / 도메인 =====
+
+variable "domain_name" {
+  description = "기본 도메인 이름 (예: einsof.app)"
   type        = string
 }
 
+variable "route53_zone_id" {
+  description = "기존 Route53 호스팅 영역 ID (도메인 등록 시 생성된 존을 참조)"
+  type        = string
+}
+
+variable "cloudfront_zone_id" {
+  description = "CloudFront 배포 zone ID (전 세계 고정값)"
+  type        = string
+  default     = "Z2FDTNDATAQYW2"
+}
 # ===== CloudWatch =====
 
 variable "alarm_email" {

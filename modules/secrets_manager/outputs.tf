@@ -1,6 +1,6 @@
-output "authorization_private_key_secret_arn" {
-  description = "authorization Private Key 시크릿 ARN"
-  value       = aws_secretsmanager_secret.authorization_private_key.arn
+output "authorization_secret_arn" {
+  description = "authorization 대칭 시크릿(HS256) ARN"
+  value       = aws_secretsmanager_secret.authorization_secret.arn
 }
 
 output "reservation_private_key_secret_arn" {
