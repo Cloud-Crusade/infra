@@ -157,6 +157,14 @@ variable "cloudfront_zone_id" {
   default     = "Z2FDTNDATAQYW2"
 }
 
+# AWS Parameters and Secrets Lambda Extension (ap-northeast-2, x86_64)
+# captcha Lambda 가 Secrets Manager 를 런타임 캐시 조회할 때 사용. 버전은 최신 확인 후 갱신
+variable "secrets_extension_layer_arn" {
+  description = "AWS Parameters and Secrets Lambda Extension 레이어 ARN"
+  type        = string
+  default     = "arn:aws:lambda:ap-northeast-2:738900069198:layer:AWS-Parameters-and-Secrets-Lambda-Extension:11"
+}
+
 # ===== CAPTCHA =====
 
 variable "captcha_enabled" {
