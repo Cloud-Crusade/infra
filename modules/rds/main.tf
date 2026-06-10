@@ -33,7 +33,8 @@ resource "aws_db_instance" "primary_replica" {
   instance_class      = var.instance_class
   replicate_source_db = aws_db_instance.primary.arn
 
-  availability_zone = var.azs[0]
+  # core 읽기: AZ1 은 primary(쓰기와 동일), AZ2 는 이 replica → AZ2 배치
+  availability_zone = var.azs[1]
 
   db_subnet_group_name   = aws_db_subnet_group.db_sg.name
   vpc_security_group_ids = var.vpc_security_group_ids
@@ -72,7 +73,8 @@ resource "aws_db_instance" "reservation_replica" {
   instance_class      = var.instance_class
   replicate_source_db = aws_db_instance.reservation.arn
 
-  availability_zone = var.azs[1]
+  # 예약 읽기: AZ1 은 이 replica → AZ1 배치 (AZ2 는 reservation_replica_2)
+  availability_zone = var.azs[0]
 
   db_subnet_group_name   = aws_db_subnet_group.db_sg.name
   vpc_security_group_ids = var.vpc_security_group_ids

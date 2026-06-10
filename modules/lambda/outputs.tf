@@ -8,6 +8,11 @@ output "function_arns" {
   value       = { for k, f in aws_lambda_function.this : k => f.arn }
 }
 
+output "invoke_arns" {
+  description = "모듈명 → Lambda invoke ARN (API Gateway 통합용)"
+  value       = { for k, f in aws_lambda_function.this : k => f.invoke_arn }
+}
+
 output "function_urls" {
   description = "모듈명 → Function URL (생성된 모듈만)"
   value       = { for k, u in aws_lambda_function_url.this : k => u.function_url }

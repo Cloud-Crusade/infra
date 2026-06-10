@@ -1,0 +1,29 @@
+#!/bin/bash
+set -euxo pipefail
+
+# Docker
+dnf install -y docker
+systemctl enable --now docker
+
+cat > /opt/app.env <<'ENVEOF'
+ENV=development
+CORS_ALLOW_ORIGINS=["*"]
+CORE_WRITER_URL=${core_writer_url}
+CORE_READER_URL=${core_reader_url}
+RESERVATION_WRITER_URL=${reservation_writer_url}
+RESERVATION_READER_URL=${reservation_reader_url}
+REDIS_URL=${redis_url}
+JWT_SECRET=${jwt_secret}
+JWT_ACCESS_TTL_SECONDS=1800
+JWT_REFRESH_TTL_SECONDS=1209600
+AWS_REGION=${region}
+SQS_RESERVATION_QUEUE_URL=${sqs_queue_url}
+SEAT_HOLD_TTL_SECONDS=300
+ENVEOF
+
+# ECR 로그인 → 이미지 pull → 실행
+IMAGE="${image}"
+REGISTRY=$(echo "$IMAGE" | cut -d/ -f1)
+aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin "$REGISTRY"
+docker pull "$IMAGE"
+docker run -d --restart always -p ${port}:${port} -v /opt/app.env:/app/.env:ro "$IMAGE"
