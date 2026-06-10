@@ -50,9 +50,15 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
-  # SSL 인증서 설정 (CloudFront 기본 인증서 사용)
+  # 커스텀 도메인 별칭 (acm_certificate_arn 과 함께 사용)
+  aliases = var.aliases
+
+  # SSL 인증서 — acm_certificate_arn 제공 시 커스텀 도메인(ACM, sni-only), 아니면 CloudFront 기본 인증서
   viewer_certificate {
-    cloudfront_default_certificate = true
+    cloudfront_default_certificate = var.acm_certificate_arn == "" ? true : null
+    acm_certificate_arn            = var.acm_certificate_arn == "" ? null : var.acm_certificate_arn
+    ssl_support_method             = var.acm_certificate_arn == "" ? null : "sni-only"
+    minimum_protocol_version       = var.acm_certificate_arn == "" ? "TLSv1" : "TLSv1.2_2021"
   }
 
   tags = {

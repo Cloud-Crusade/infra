@@ -41,6 +41,24 @@ variable "function_url_modules" {
   default     = []
 }
 
+variable "vpc_modules" {
+  type        = set(string)
+  description = "VPC 에 연결할 모듈명 집합 (ElastiCache/RDS 등 VPC 내부 접근). 비우면 미연결"
+  default     = []
+}
+
+variable "vpc_subnet_ids" {
+  type        = list(string)
+  description = "VPC 연결 람다의 서브넷 ID 목록 (보통 프라이빗)"
+  default     = []
+}
+
+variable "vpc_security_group_ids" {
+  type        = list(string)
+  description = "VPC 연결 람다의 보안 그룹 ID 목록"
+  default     = []
+}
+
 variable "runtime" {
   type        = string
   description = "Lambda 런타임"
