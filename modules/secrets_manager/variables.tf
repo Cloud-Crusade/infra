@@ -47,3 +47,10 @@ variable "reservation_writer_endpoint" {
   type        = string
   default     = ""
 }
+
+variable "captcha_hmac_secret_value" {
+  description = "캡차(ALTCHA PoW) 서명/검증용 HMAC 시크릿"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

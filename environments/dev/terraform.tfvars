@@ -24,6 +24,9 @@ db_username = "ccadmin"
 public_bucket             = "einsof-service-625368338405-ap-northeast-2-an"
 public_bucket_domain_name = "einsof-service-625368338405-ap-northeast-2-an.s3.ap-northeast-2.amazonaws.com"
 
+# 예매 캡차 활성화(dev). 끄려면 false 또는 TF_VAR_captcha_enabled=false
+captcha_enabled = true
+
 # ===== Route53 / 도메인 =====
 # domain_name·route53_zone_id 는 tfvars 에 적지 않는다 — tfvars 값이 TF_VAR_ 환경변수보다
 # 우선해 덮어쓰기 때문(빈 문자열도 우선). 환경별 값이므로 TF_VAR_ 로만 주입한다.

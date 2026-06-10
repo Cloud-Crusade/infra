@@ -73,6 +73,7 @@ module "secrets_manager" {
   rds_password                  = var.db_password
   core_writer_endpoint          = module.rds.primary_endpoint
   reservation_writer_endpoint   = module.rds.reservation_endpoint
+  captcha_hmac_secret_value     = random_password.captcha_hmac.result
 }
 module "iam" {
   source            = "../../modules/iam"
@@ -162,6 +163,15 @@ module "lambda" {
     authorizer = {
       PUBLIC_KEY_URL = "https://${module.cloudfront.cloudfront_domain_name}/jwt/${var.environment}/reservation/public_key.pem"
     }
+    # captcha — HMAC 시크릿은 값이 아닌 이름만 주입, 런타임에 Secrets 확장 캐시로 조회
+    captcha = {
+      CAPTCHA_SECRET_ID = "${var.environment}-captcha-hmac-secret"
+    }
+  }
+
+  # captcha 만 Secrets Manager 확장 레이어 부착 — 시크릿 캐시 조회(호출 수·비용 절감)
+  layers = {
+    captcha = [var.secrets_extension_layer_arn]
   }
 }
 
@@ -174,6 +184,11 @@ module "apigateway" {
   reservation_backend_url    = "http://${aws_instance.test_service.public_dns}:${var.test_service_port}"
   queue_lambda_invoke_arn    = module.lambda.invoke_arns["ticketing"]
   queue_lambda_function_name = module.lambda.function_names["ticketing"]
+
+  # captcha Lambda 가 배포(lambda-modules.txt 등록)됐을 때만 라우트 생성 — 미배포 시 plan 실패 방지
+  enable_captcha_route         = contains(keys(module.lambda.function_names), "captcha")
+  captcha_lambda_invoke_arn    = lookup(module.lambda.invoke_arns, "captcha", "")
+  captcha_lambda_function_name = lookup(module.lambda.function_names, "captcha", "")
 
   authorizer_lambda_invoke_arn    = module.lambda.invoke_arns["authorizer"]
   authorizer_lambda_function_name = module.lambda.function_names["authorizer"]

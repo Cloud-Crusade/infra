@@ -76,3 +76,9 @@ variable "timeout" {
   description = "Lambda 타임아웃(초)"
   default     = 30
 }
+
+variable "layers" {
+  type        = map(list(string))
+  description = "모듈명 → Lambda Layer ARN 목록 (예: captcha 의 Secrets 확장 레이어). 없는 모듈은 미부착"
+  default     = {}
+}
