@@ -53,6 +53,19 @@ module "vpc" {
   private_subnet_cidrs = var.private_subnet_cidrs
   availability_zones   = var.availability_zones
   enable_nat_gateway   = var.enable_nat_gateway
+  # VPC 내부 ticketing 람다가 NAT 없이 Secrets Manager 조회(인터페이스 엔드포인트)
+  enable_secretsmanager_endpoint = true
+}
+
+# SM 엔드포인트 인바운드(443) — 실제 SM 접근이 필요한 lambda SG 만 허용(최소권한, 모듈 순환 회피)
+resource "aws_security_group_rule" "sm_endpoint_from_lambda" {
+  type                     = "ingress"
+  security_group_id        = module.vpc.secretsmanager_endpoint_security_group_id
+  source_security_group_id = module.security_groups.lambda_sg_id
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  description              = "SM endpoint inbound from lambda SG"
 }
 
 module "security_groups" {
@@ -155,14 +168,14 @@ module "lambda" {
     ticketing = {
       REDIS_HOST = module.elasticache.waiting_room_cache_endpoint
       REDIS_PORT = "6379"
-      # terraform 이 생성하는 예약 서명키(개인키) 주입 — 검증측은 S3 의 공개키 사용
-      JWT_SECRET = tls_private_key.reservation.private_key_pem
+      # 예약 서명키(RSA 개인키)는 값이 아닌 이름만 — 런타임에 Secrets 확장 캐시로 조회(VPC 엔드포인트 경유)
+      RESERVATION_SECRET_ID = module.secrets_manager.reservation_private_key_secret_arn
     }
     # 예약 토큰 서명 검증 authorizer — CloudFront 로 reservation 공개키 fetch(RS256 검증)
     # S3 직접 접근 대신 CloudFront URL → S3 IAM 불필요 + 접근 비용 절감
     authorizer = {
       PUBLIC_KEY_URL = "https://${module.cloudfront.cloudfront_domain_name}/jwt/${var.environment}/reservation/public_key.pem"
-      # Authorization 대칭키(HS256) ARN — 값이 아닌 ARN 주입, 런타임에 Secrets 확장 캐시로 조회
+      # Authorization 대칭키(HS256) — 값이 아닌 이름만, 런타임에 Secrets 확장 캐시로 조회
       AUTHORIZATION_SECRET_ARN = module.secrets_manager.authorization_secret_arn
     }
     # captcha — HMAC 시크릿은 값이 아닌 이름만 주입, 런타임에 Secrets 확장 캐시로 조회
@@ -175,6 +188,7 @@ module "lambda" {
   layers = {
     captcha    = [var.secrets_extension_layer_arn]
     authorizer = [var.secrets_extension_layer_arn]
+    ticketing  = [var.secrets_extension_layer_arn]
   }
 }
 
