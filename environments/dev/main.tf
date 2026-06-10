@@ -252,8 +252,8 @@ module "cloudwatch" {
 
   # ElastiCache
   elasticache_cluster_ids = [
-    "${var.project_name}-${var.environment}-main-cache",
-    "${var.project_name}-${var.environment}-waiting-room",
+    module.elasticache.main_cache_cluster_id,
+    module.elasticache.waiting_room_cache_cluster_id,
   ]
 
   # SQS
