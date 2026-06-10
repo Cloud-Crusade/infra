@@ -43,12 +43,12 @@ output "lambda_duration_alarm_arns" {
 
 output "cloudfront_5xx_alarm_arn" {
   description = "CloudFront 5xx error rate alarm ARN"
-  value       = { for k, v in aws_cloudwatch_metric_alarm.cloudfront_5xx : k => v.arn }
+  value       = aws_cloudwatch_metric_alarm.cloudfront_5xx.arn
 }
 
 output "cloudfront_4xx_alarm_arn" {
   description = "CloudFront 4xx error rate alarm ARN"
-  value       = { for k, v in aws_cloudwatch_metric_alarm.cloudfront_4xx : k => v.arn }
+  value       = aws_cloudwatch_metric_alarm.cloudfront_4xx.arn
 }
 
 # ===== ElastiCache (틀만 — 모듈 연결 후 활성화) =====
