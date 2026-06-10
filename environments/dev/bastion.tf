@@ -25,6 +25,18 @@ resource "aws_instance" "bastion" {
   tags = {
     Name = "${var.project_name}-${var.environment}-bastion"
   }
+
+  user_data = <<-EOF
+              #!/bin/bash
+              dnf update -y
+
+              dnf install -y docker
+
+              systemctl start docker
+              systemctl enable docker
+
+              usermod -aG docker ec2-user
+              EOF
 }
 
 # bastion 개인키를 backend(state) 와 동일한 S3 버킷에 업로드 (팀 SSH 접근용)
