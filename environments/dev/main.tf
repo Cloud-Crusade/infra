@@ -250,11 +250,8 @@ module "cloudwatch" {
   # CloudFront
   cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
 
-  # ElastiCache
-  elasticache_cluster_ids = [
-    module.elasticache.main_cache_endpoint,
-    module.elasticache.waiting_room_cache_endpoint,
-  ]
+  # ElastiCache (틀만 — cluster ID 확인 후 활성화)
+  elasticache_cluster_ids = []
 
   # SQS
   sqs_queue_names = [module.sqs.queue_name]
