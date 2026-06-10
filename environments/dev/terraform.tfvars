@@ -35,3 +35,6 @@ captcha_enabled = true
 # 로컬: export TF_VAR_domain_name=... TF_VAR_route53_zone_id=...
 # api 레코드는 API Gateway 커스텀 도메인(apigateway 모듈, REGIONAL)에 자동 연결 — 별도 대상 입력 불필요
 # cloudfront_zone_id 는 기본값(전역 CloudFront) 사용
+# ===== EKS =====
+eks_cluster_version        = "1.31"
+eks_endpoint_public_access = false

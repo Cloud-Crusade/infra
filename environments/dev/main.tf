@@ -225,3 +225,11 @@ module "route53" {
   api_target_dns_name = module.apigateway.domain_regional_target
   api_target_zone_id  = module.apigateway.domain_regional_zone_id
 }
+module "eks" {
+  source                 = "../../modules/eks"
+  project_name           = var.project_name
+  environment            = var.environment
+  subnet_ids             = module.vpc.private_subnet_ids
+  cluster_version        = var.eks_cluster_version
+  endpoint_public_access = var.eks_endpoint_public_access
+}

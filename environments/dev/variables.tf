@@ -164,3 +164,14 @@ variable "captcha_enabled" {
   type        = bool
   default     = false
 }
+# ===== EKS =====
+variable "eks_cluster_version" {
+  description = "EKS 클러스터 버전"
+  type        = string
+  default     = "1.31"
+}
+variable "eks_endpoint_public_access" {
+  description = "EKS API 서버 퍼블릭 엔드포인트 활성화 여부"
+  type        = bool
+  default     = false
+}
