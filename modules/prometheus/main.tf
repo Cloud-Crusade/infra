@@ -32,5 +32,3 @@ resource "helm_release" "prometheus" {
   }
 }
 
-# EKS (틀만 — 모듈 연결 후 활성화)
-eks_cluster_name = ""
