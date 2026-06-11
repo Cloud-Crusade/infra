@@ -297,3 +297,11 @@ module "cloudwatch" {
   # API Gateway (틀만 — 모듈 연결 후 활성화)
   api_gateway_name = ""
 }
+
+module "nlb" {
+  source = "../../modules/nlb"
+
+  project_name = var.project_name
+  environment = var.environment
+  subnet_ids = module.vpc.private_subnet_ids
+}
