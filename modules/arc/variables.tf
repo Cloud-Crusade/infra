@@ -6,7 +6,7 @@ variable "lb_arn" {
 variable "zonal_autoshift_status" {
   description = "Zonal Autoshift 활성화 여부 (ENABLED 또는 DISABLED)"
   type        = string
-  default     = "ENABLED"
+  default     = "DISABLED"
 
   validation {
     condition     = contains(["ENABLED", "DISABLED"], var.zonal_autoshift_status)
