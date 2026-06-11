@@ -1,3 +1,13 @@
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+}
+
 resource "tls_private_key" "bastion" {
   algorithm = "RSA"
   rsa_bits  = 4096
@@ -15,7 +25,7 @@ resource "local_file" "bastion_private_key" {
 }
 
 resource "aws_instance" "bastion" {
-  ami                         = var.bastion_ami
+  ami                         = data.aws_ami.amazon_linux.id
   instance_type               = var.bastion_instance_type
   subnet_id                   = module.vpc.public_subnet_ids[0]
   vpc_security_group_ids      = [module.security_groups.bastion_sg_id]
@@ -27,16 +37,25 @@ resource "aws_instance" "bastion" {
   }
 
   user_data = <<-EOF
-              #!/bin/bash
-              dnf update -y
+                #!/bin/bash
+                set -e
+                exec > /var/log/user-data.log 2>&1
 
-              dnf install -y docker
+                yum update -y
 
-              systemctl start docker
-              systemctl enable docker
+                # docker
+                amazon-linux-extras install -y docker
+                systemctl enable docker
+                systemctl start docker
+                usermod -aG docker ec2-user
 
-              usermod -aG docker ec2-user
-              EOF
+                # k6 
+                yum install -y https://dl.k6.io/rpm/repo.rpm
+                yum install -y k6 --nogpgcheck
+
+                # stress
+                yum install -y stress
+                EOF
 }
 
 # bastion 개인키를 backend(state) 와 동일한 S3 버킷에 업로드 (팀 SSH 접근용)

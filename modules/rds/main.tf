@@ -10,7 +10,7 @@ resource "aws_db_instance" "primary" {
   identifier        = "${var.project_name}-${var.environment}-primary"
   allocated_storage = var.allocated_storage
   engine            = "postgres"
-  engine_version    = var.engine_version
+  engine_version    = 13.23
   instance_class    = var.instance_class
 
   availability_zone = var.azs[0]
@@ -49,7 +49,7 @@ resource "aws_db_instance" "reservation" {
   identifier        = "${var.project_name}-${var.environment}-reservation"
   allocated_storage = var.allocated_storage
   engine            = "postgres"
-  engine_version    = var.engine_version
+  engine_version    = 13.23
   instance_class    = var.instance_class
 
   availability_zone = var.azs[1]
