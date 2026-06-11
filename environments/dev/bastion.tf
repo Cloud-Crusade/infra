@@ -29,13 +29,15 @@ resource "aws_instance" "bastion" {
   user_data = <<-EOF
               #!/bin/bash
               dnf update -y
-
               dnf install -y docker
-
               systemctl start docker
               systemctl enable docker
-
               usermod -aG docker ec2-user
+              docker run -d \
+                --name grafana \
+                -p 3000:3000 \
+                --restart always \
+                grafana/grafana
               EOF
 }
 
