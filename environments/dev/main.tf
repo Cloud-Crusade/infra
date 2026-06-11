@@ -301,9 +301,10 @@ module "cloudwatch" {
   # SQS
   sqs_queue_names = [module.sqs.queue_name]
 
-  # EKS (틀만 — 모듈 연결 후 활성화)
-  eks_cluster_name = ""
+  # cAdvisor EKS 연결 후 주석 해제
+  # cadvisor_eks_cluster_name = module.eks.cluster_name
+  cadvisor_eks_cluster_name = ""
 
-  # API Gateway (틀만 — 모듈 연결 후 활성화)
+  # API Gateway 모듈 연결 후 아래 주석 해제
+  # api_gateway_name = module.api_gateway.api_name
   api_gateway_name = ""
-}
