@@ -376,31 +376,123 @@ resource "aws_cloudwatch_dashboard" "main" {
 
   dashboard_body = jsonencode({
     widgets = [
-      # Lambda 에러
+      # SQS
       {
-        type = "metric"
+        type   = "metric"
+        x      = 0
+        y      = 0
+        width  = 8
+        height = 6
+
         properties = {
-          title   = "Lambda Errors"
-          metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Errors", "FunctionName", fn]]
-          period  = 60
-          stat    = "Sum"
-          view    = "timeSeries"
-        }
-      },
-      # Lambda 실행 시간
-      {
-        type = "metric"
-        properties = {
-          title   = "Lambda Duration"
-          metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Duration", "FunctionName", fn]]
-          period  = 60
+          title   = "SQS Queue Depth"
+          metrics = [for q in var.sqs_queue_names : ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", q]]
+          period  = 300
           stat    = "Average"
           view    = "timeSeries"
         }
       },
-      # RDS CPU
       {
-        type = "metric"
+        type   = "metric"
+        x      = 8
+        y      = 0
+        width  = 8
+        height = 6
+
+        properties = {
+          title   = "SQS Oldest Message"
+          metrics = [for q in var.sqs_queue_names : ["AWS/SQS", "ApproximateAgeOfOldestMessage", "QueueName", q]]
+          period  = 300
+          stat    = "Maximum"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 16
+        y      = 0
+        width  = 8
+        height = 6
+
+        properties = {
+          title   = "SQS Messages Received"
+          metrics = [for q in var.sqs_queue_names : ["AWS/SQS", "NumberOfMessagesReceived", "QueueName", q]]
+          period  = 300
+          stat    = "Sum"
+          view    = "timeSeries"
+        }
+      },
+
+      # ElastiCache
+      {
+        type   = "metric"
+        x      = 0
+        y      = 6
+        width  = 6
+        height = 6
+
+        properties = {
+          title   = "ElastiCache Engine CPU"
+          metrics = [for id in var.elasticache_cluster_ids : ["AWS/ElastiCache", "EngineCPUUtilization", "CacheClusterId", id, "CacheNodeId", "0001"]]
+          period  = 300
+          stat    = "Average"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 6
+        y      = 6
+        width  = 6
+        height = 6
+
+        properties = {
+          title   = "ElastiCache Memory Usage"
+          metrics = [for id in var.elasticache_cluster_ids : ["AWS/ElastiCache", "DatabaseMemoryUsagePercentage", "CacheClusterId", id, "CacheNodeId", "0001"]]
+          period  = 300
+          stat    = "Average"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 6
+        width  = 6
+        height = 6
+
+        properties = {
+          title   = "ElastiCache Current Connections"
+          metrics = [for id in var.elasticache_cluster_ids : ["AWS/ElastiCache", "CurrConnections", "CacheClusterId", id, "CacheNodeId", "0001"]]
+          period  = 300
+          stat    = "Average"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 18
+        y      = 6
+        width  = 6
+        height = 6
+
+        properties = {
+          title   = "ElastiCache Evictions"
+          metrics = [for id in var.elasticache_cluster_ids : ["AWS/ElastiCache", "Evictions", "CacheClusterId", id, "CacheNodeId", "0001"]]
+          period  = 300
+          stat    = "Sum"
+          view    = "timeSeries"
+        }
+      },
+
+      # RDS
+      {
+        type   = "metric"
+        x      = 0
+        y      = 12
+        width  = 6
+        height = 6
+
         properties = {
           title   = "RDS CPU Utilization"
           metrics = [for id in var.rds_instance_ids : ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", id]]
@@ -409,9 +501,122 @@ resource "aws_cloudwatch_dashboard" "main" {
           view    = "timeSeries"
         }
       },
-      # CloudFront 에러율
       {
-        type = "metric"
+        type   = "metric"
+        x      = 6
+        y      = 12
+        width  = 6
+        height = 6
+
+        properties = {
+          title   = "RDS Database Connections"
+          metrics = [for id in var.rds_instance_ids : ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", id]]
+          period  = 300
+          stat    = "Average"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 12
+        width  = 6
+        height = 6
+
+        properties = {
+          title   = "RDS Read Latency"
+          metrics = [for id in var.rds_instance_ids : ["AWS/RDS", "ReadLatency", "DBInstanceIdentifier", id]]
+          period  = 300
+          stat    = "Average"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 18
+        y      = 12
+        width  = 6
+        height = 6
+
+        properties = {
+          title   = "RDS Write Latency"
+          metrics = [for id in var.rds_instance_ids : ["AWS/RDS", "WriteLatency", "DBInstanceIdentifier", id]]
+          period  = 300
+          stat    = "Average"
+          view    = "timeSeries"
+        }
+      },
+
+      # Lambda
+      {
+        type   = "metric"
+        x      = 0
+        y      = 18
+        width  = 6
+        height = 6
+
+        properties = {
+          title   = "Lambda Invocations"
+          metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Invocations", "FunctionName", fn]]
+          period  = 60
+          stat    = "Sum"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 6
+        y      = 18
+        width  = 6
+        height = 6
+
+        properties = {
+          title   = "Lambda Errors"
+          metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Errors", "FunctionName", fn]]
+          period  = 60
+          stat    = "Sum"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 18
+        width  = 6
+        height = 6
+
+        properties = {
+          title   = "Lambda Duration"
+          metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Duration", "FunctionName", fn]]
+          period  = 60
+          stat    = "Average"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 18
+        y      = 18
+        width  = 6
+        height = 6
+
+        properties = {
+          title   = "Lambda Throttles"
+          metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Throttles", "FunctionName", fn]]
+          period  = 60
+          stat    = "Sum"
+          view    = "timeSeries"
+        }
+      },
+
+      # CloudFront
+      {
+        type   = "metric"
+        x      = 0
+        y      = 24
+        width  = 24
+        height = 6
+
         properties = {
           title = "CloudFront Error Rate"
           metrics = var.cloudfront_distribution_id != "" ? [
