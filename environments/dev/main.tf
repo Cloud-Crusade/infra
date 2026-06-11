@@ -263,7 +263,6 @@ module "cloudwatch" {
   environment  = var.environment
   alarm_email  = var.alarm_email
 
-
   # RDS
   rds_instance_ids = [
     "${var.project_name}-${var.environment}-primary",
@@ -291,6 +290,9 @@ module "cloudwatch" {
 
   # SQS
   sqs_queue_names = [module.sqs.queue_name]
+
+  # EKS (틀만 — 모듈 연결 후 활성화)
+  eks_cluster_name = ""
 
   # API Gateway (틀만 — 모듈 연결 후 활성화)
   api_gateway_name = ""
