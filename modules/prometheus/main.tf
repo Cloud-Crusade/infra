@@ -1,4 +1,4 @@
-#===== Prometheus Helm 배포 =====
+# ===== Prometheus Helm 배포 =====
 
 resource "helm_release" "prometheus" {
   count            = var.eks_cluster_name != "" ? 1 : 0
@@ -8,20 +8,17 @@ resource "helm_release" "prometheus" {
   version          = var.prometheus_chart_version
   namespace        = var.prometheus_namespace
   create_namespace = true
-  set {
-    name  = "server.retention"
-    value = "${var.retention_days}d"
-  }
-  set {
-    name  = "server.global.scrape_interval"
-    value = "15s"
-  }
-  set {
-    name  = "nodeExporter.enabled"
-    value = "true"
-  }
-  set {
-    name  = "alertmanager.enabled"
-    value = "false"
-  }
+
+  values = [
+    <<-YAML
+    server:
+      retention: "${var.retention_days}d"
+      global:
+        scrape_interval: "15s"
+    nodeExporter:
+      enabled: true
+    alertmanager:
+      enabled: false
+    YAML
+  ]
 }
