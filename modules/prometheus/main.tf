@@ -32,13 +32,5 @@ resource "helm_release" "prometheus" {
   }
 }
 
-module "prometheus" {
-  source = "../../modules/prometheus"
-
-  project_name = var.project_name
-  environment  = var.environment
-
-  # EKS 머지 후 아래 주석 해제
-  # eks_cluster_name = module.eks.cluster_name
+  # EKS (틀만 — 모듈 연결 후 활성화)
   eks_cluster_name = ""
-}

@@ -262,6 +262,7 @@ module "cloudwatch" {
   project_name = var.project_name
   environment  = var.environment
   alarm_email  = var.alarm_email
+  
 
   # RDS
   rds_instance_ids = [
@@ -291,9 +292,16 @@ module "cloudwatch" {
   # SQS
   sqs_queue_names = [module.sqs.queue_name]
 
-  # EKS (틀만 — 모듈 연결 후 활성화)
-  eks_cluster_name = ""
-
   # API Gateway (틀만 — 모듈 연결 후 활성화)
   api_gateway_name = ""
+}
+
+module "prometheus" {
+  source = "../../modules/prometheus"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  # EKS (틀만 — 모듈 연결 후 활성화)
+  eks_cluster_name = ""
 }
