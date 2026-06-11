@@ -423,27 +423,92 @@ resource "aws_cloudwatch_dashboard" "main" {
         }
       },
 
-      # ElastiCache
+      # ElastiCache CPU
       {
         type   = "metric"
         x      = 0
         y      = 6
-        width  = 6
+        width  = 12
         height = 6
 
         properties = {
-          title   = "ElastiCache Engine CPU"
-          metrics = [for id in var.elasticache_cluster_ids : ["AWS/ElastiCache", "EngineCPUUtilization", "CacheClusterId", id, "CacheNodeId", "0001"]]
-          period  = 300
-          stat    = "Average"
-          view    = "timeSeries"
+          title = "Main Cache CPU"
+
+          metrics = [
+            ["AWS/ElastiCache", "EngineCPUUtilization", "CacheClusterId", var.elasticache_cluster_ids[0], "CacheNodeId", "0001"]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
         }
       },
       {
         type   = "metric"
-        x      = 6
+        x      = 12
         y      = 6
-        width  = 6
+        width  = 12
+        height = 6
+
+        properties = {
+          title = "Waiting Room Cache CPU"
+
+          metrics = [
+            ["AWS/ElastiCache", "EngineCPUUtilization", "CacheClusterId", var.elasticache_cluster_ids[1], "CacheNodeId", "0001"]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+
+      # ElastiCache Connections
+      {
+        type   = "metric"
+        x      = 0
+        y      = 12
+        width  = 12
+        height = 6
+
+        properties = {
+          title = "Main Cache Connections"
+
+          metrics = [
+            ["AWS/ElastiCache", "CurrConnections", "CacheClusterId", var.elasticache_cluster_ids[0], "CacheNodeId", "0001"]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 12
+        width  = 12
+        height = 6
+
+        properties = {
+          title = "Waiting Room Cache Connections"
+
+          metrics = [
+            ["AWS/ElastiCache", "CurrConnections", "CacheClusterId", var.elasticache_cluster_ids[1], "CacheNodeId", "0001"]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+
+      # ElastiCache 통합 지표
+      {
+        type   = "metric"
+        x      = 0
+        y      = 18
+        width  = 12
         height = 6
 
         properties = {
@@ -457,23 +522,8 @@ resource "aws_cloudwatch_dashboard" "main" {
       {
         type   = "metric"
         x      = 12
-        y      = 6
-        width  = 6
-        height = 6
-
-        properties = {
-          title   = "ElastiCache Current Connections"
-          metrics = [for id in var.elasticache_cluster_ids : ["AWS/ElastiCache", "CurrConnections", "CacheClusterId", id, "CacheNodeId", "0001"]]
-          period  = 300
-          stat    = "Average"
-          view    = "timeSeries"
-        }
-      },
-      {
-        type   = "metric"
-        x      = 18
-        y      = 6
-        width  = 6
+        y      = 18
+        width  = 12
         height = 6
 
         properties = {
@@ -485,42 +535,206 @@ resource "aws_cloudwatch_dashboard" "main" {
         }
       },
 
-      # RDS
+      # RDS CPU
       {
         type   = "metric"
         x      = 0
-        y      = 12
-        width  = 6
+        y      = 24
+        width  = 8
         height = 6
 
         properties = {
-          title   = "RDS CPU Utilization"
-          metrics = [for id in var.rds_instance_ids : ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", id]]
-          period  = 300
-          stat    = "Average"
-          view    = "timeSeries"
+          title = "Primary DB CPU"
+
+          metrics = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", var.rds_instance_ids[0]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
         }
       },
       {
         type   = "metric"
-        x      = 6
-        y      = 12
-        width  = 6
+        x      = 8
+        y      = 24
+        width  = 8
         height = 6
 
         properties = {
-          title   = "RDS Database Connections"
-          metrics = [for id in var.rds_instance_ids : ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", id]]
-          period  = 300
-          stat    = "Average"
-          view    = "timeSeries"
+          title = "Primary Replica DB CPU"
+
+          metrics = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", var.rds_instance_ids[1]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 16
+        y      = 24
+        width  = 8
+        height = 6
+
+        properties = {
+          title = "Reservation DB CPU"
+
+          metrics = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", var.rds_instance_ids[2]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 30
+        width  = 12
+        height = 6
+
+        properties = {
+          title = "Reservation Replica DB CPU"
+
+          metrics = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", var.rds_instance_ids[3]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
         }
       },
       {
         type   = "metric"
         x      = 12
-        y      = 12
-        width  = 6
+        y      = 30
+        width  = 12
+        height = 6
+
+        properties = {
+          title = "Reservation Replica 2 DB CPU"
+
+          metrics = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", var.rds_instance_ids[4]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+
+      # RDS Connections
+      {
+        type   = "metric"
+        x      = 0
+        y      = 36
+        width  = 8
+        height = 6
+
+        properties = {
+          title = "Primary DB Connections"
+
+          metrics = [
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_instance_ids[0]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 8
+        y      = 36
+        width  = 8
+        height = 6
+
+        properties = {
+          title = "Primary Replica DB Connections"
+
+          metrics = [
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_instance_ids[1]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 16
+        y      = 36
+        width  = 8
+        height = 6
+
+        properties = {
+          title = "Reservation DB Connections"
+
+          metrics = [
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_instance_ids[2]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 42
+        width  = 12
+        height = 6
+
+        properties = {
+          title = "Reservation Replica DB Connections"
+
+          metrics = [
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_instance_ids[3]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 42
+        width  = 12
+        height = 6
+
+        properties = {
+          title = "Reservation Replica 2 DB Connections"
+
+          metrics = [
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_instance_ids[4]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+
+      # RDS Latency
+      {
+        type   = "metric"
+        x      = 0
+        y      = 48
+        width  = 12
         height = 6
 
         properties = {
@@ -533,9 +747,9 @@ resource "aws_cloudwatch_dashboard" "main" {
       },
       {
         type   = "metric"
-        x      = 18
-        y      = 12
-        width  = 6
+        x      = 12
+        y      = 48
+        width  = 12
         height = 6
 
         properties = {
@@ -551,7 +765,7 @@ resource "aws_cloudwatch_dashboard" "main" {
       {
         type   = "metric"
         x      = 0
-        y      = 18
+        y      = 54
         width  = 6
         height = 6
 
@@ -566,7 +780,7 @@ resource "aws_cloudwatch_dashboard" "main" {
       {
         type   = "metric"
         x      = 6
-        y      = 18
+        y      = 54
         width  = 6
         height = 6
 
@@ -581,7 +795,7 @@ resource "aws_cloudwatch_dashboard" "main" {
       {
         type   = "metric"
         x      = 12
-        y      = 18
+        y      = 54
         width  = 6
         height = 6
 
@@ -596,7 +810,7 @@ resource "aws_cloudwatch_dashboard" "main" {
       {
         type   = "metric"
         x      = 18
-        y      = 18
+        y      = 54
         width  = 6
         height = 6
 
@@ -613,7 +827,7 @@ resource "aws_cloudwatch_dashboard" "main" {
       {
         type   = "metric"
         x      = 0
-        y      = 24
+        y      = 60
         width  = 24
         height = 6
 
