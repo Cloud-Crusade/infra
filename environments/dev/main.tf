@@ -262,7 +262,7 @@ module "cloudwatch" {
   project_name = var.project_name
   environment  = var.environment
   alarm_email  = var.alarm_email
-  
+
 
   # RDS
   rds_instance_ids = [
