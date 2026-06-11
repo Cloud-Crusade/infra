@@ -238,6 +238,15 @@ module "elasticache" {
   waiting_room_port                   = 6379
   waiting_room_num_clusters           = 1
   waiting_room_sg_id                  = module.security_groups.cache_sg_id
+
+  blacklist_replication_group_id   = "${var.project_name}-${var.environment}-blacklist"
+  blacklist_engine                 = "redis"
+  blacklist_engine_version         = "7.1"
+  blacklist_parameter_group_family = "redis7"
+  blacklist_node_type              = "cache.t3.micro"
+  blacklist_port                   = 6379
+  blacklist_num_clusters           = 1
+  blacklist_sg_id                  = module.security_groups.cache_sg_id
 }
 
 # Route53 레코드 — www → CloudFront(클라이언트), api → ALB(서버)
