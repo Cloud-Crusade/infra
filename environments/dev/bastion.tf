@@ -37,31 +37,18 @@ resource "aws_instance" "bastion" {
   }
 
   user_data = <<-EOF
-                #!/bin/bash
-                set -e
-                exec > /var/log/user-data.log 2>&1
 
-                yum update -y
-
-                # docker 설치
-                amazon-linux-extras install -y docker
-                systemctl enable docker
-                systemctl start docker
-                usermod -aG docker ec2-user
-
-                # docker compose 설치
-                mkdir -p /usr/local/lib/docker/cli-plugins/
-                curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose 
-                chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-                ln -s /usr/local/lib/docker/cli-plugins/docker-compose /usr/bin/docker-compose
+                # docker compsoe 설치
+       	        mkdir -p /usr/libexec/docker/cli-plugins/
+	              curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
+	              chmod +x /usr/libexec/docker/cli-plugins/docker-compose
 
                 # k6 설치
-                yum install -y https://dl.k6.io/rpm/repo.rpm
-                yum install -y k6 --nogpgcheck
+	              dnf install -y https://dl.k6.io/rpm/repo.rpm
+                dnf install -y k6 
 
                 # stress 설치
-                amazon-linux-extras install -y epel
-                yum install -y stress
+	              dnf install -y stress
                 EOF
 }
 
