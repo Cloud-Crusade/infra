@@ -43,17 +43,24 @@ resource "aws_instance" "bastion" {
 
                 yum update -y
 
-                # docker
+                # docker 설치
                 amazon-linux-extras install -y docker
                 systemctl enable docker
                 systemctl start docker
                 usermod -aG docker ec2-user
 
-                # k6 
+                # docker compose 설치
+                mkdir -p /usr/local/lib/docker/cli-plugins/
+                curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose 
+                chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+                ln -s /usr/local/lib/docker/cli-plugins/docker-compose /usr/bin/docker-compose
+
+                # k6 설치
                 yum install -y https://dl.k6.io/rpm/repo.rpm
                 yum install -y k6 --nogpgcheck
 
-                # stress
+                # stress 설치
+                amazon-linux-extras install -y epel
                 yum install -y stress
                 EOF
 }
