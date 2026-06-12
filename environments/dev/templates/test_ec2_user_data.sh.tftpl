@@ -73,11 +73,18 @@ GRPC_PORT=50051
 RESERVATION_GRPC_TARGET=dns:///reservation:50051
 ENVEOF
 
+# .env 는 시크릿(JWT/HMAC/DB URL) 포함 → 소유자만 읽기
+chmod 600 /opt/auth.env /opt/event.env /opt/reservation.env /opt/payment.env
+
 # ECR 로그인 → 네트워크 생성(서비스명으로 상호 DNS·gRPC)
 aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin "$REGISTRY"
 docker network create ticketing || true
 
+BASE_PORT=${port}
+
 run_svc() { # name hostport
+  # cloud-init 재시도·인스턴스 재사용 시 동일 이름 컨테이너 충돌 방지
+  docker rm -f "$1" 2>/dev/null || true
   docker pull "$REGISTRY/$NAMESPACE/$1:$TAG"
   docker run -d --restart always --name "$1" --network ticketing \
     -p "$2":8000 \
@@ -86,10 +93,11 @@ run_svc() { # name hostport
 }
 
 # gRPC 서버(event·reservation) 먼저 → 클라이언트(reservation·payment) 기동
-run_svc event 8002
-run_svc reservation 8003
-run_svc payment 8004
-run_svc auth 8001
+# 직접 디버깅 포트 = nginx 포트(BASE_PORT)+1..+4 (SG 인바운드 범위와 일치)
+run_svc event       $((BASE_PORT + 2))
+run_svc reservation $((BASE_PORT + 3))
+run_svc payment     $((BASE_PORT + 4))
+run_svc auth        $((BASE_PORT + 1))
 
 # nginx 게이트웨이(:${port}) — 경로별 서비스 라우팅(기존 API Gateway 백엔드 유지)
 cat > /opt/nginx.conf <<'NGINXEOF'
@@ -109,7 +117,8 @@ http {
 }
 NGINXEOF
 
+docker rm -f gateway 2>/dev/null || true
 docker run -d --restart always --name gateway --network ticketing \
   -p ${port}:80 \
   -v /opt/nginx.conf:/etc/nginx/nginx.conf:ro \
-  nginx:alpine
+  nginx:1.27-alpine

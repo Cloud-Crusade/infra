@@ -4,15 +4,28 @@
 # =========================================================
 
 variable "test_image_registry" {
-  description = "ECR 레지스트리 override (예: <acct>.dkr.ecr.<region>.amazonaws.com). 미설정 시 본 구성의 ECR repo 에서 파생. 이미지는 <registry>/<namespace>/<svc>:<tag>"
+  description = "ECR 레지스트리 override (예: <acct>.dkr.ecr.<region>.amazonaws.com). 미설정 시 현재 계정·리전에서 파생. 이미지는 <registry>/<namespace>/<svc>:<tag>"
   type        = string
   default     = ""
+}
+
+variable "ecr_namespace" {
+  description = "ECR 리포지토리 네임스페이스 prefix — cc/app CD 의 vars.ECR_NAMESPACE 와 동일해야 함"
+  type        = string
+  default     = "ticketing"
 }
 
 variable "test_image_tag" {
   description = "<namespace>/<svc> 이미지 태그"
   type        = string
   default     = "latest"
+}
+
+# 레지스트리는 ECR 리소스 의존 없이 현재 계정·리전에서 파생
+data "aws_caller_identity" "current" {}
+
+locals {
+  test_ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 }
 
 variable "test_service_port" {
@@ -147,8 +160,8 @@ resource "aws_instance" "test_service" {
   # 별도 템플릿 사용: HCL heredoc 들여쓰기로 shebang 이 깨져 cloud-init 미실행되던 문제 방지
   user_data = templatefile("${path.module}/templates/test_ec2_user_data.sh.tftpl", {
     region = var.aws_region
-    # 기본은 본 구성의 ECR 레지스트리(ticketing repo 와 동일 계정) — 필요 시 var 로 override
-    registry               = var.test_image_registry != "" ? var.test_image_registry : split("/", aws_ecr_repository.ticketing["auth"].repository_url)[0]
+    # 기본은 현재 계정·리전 ECR 레지스트리 — 필요 시 var 로 override
+    registry               = var.test_image_registry != "" ? var.test_image_registry : local.test_ecr_registry
     namespace              = var.ecr_namespace
     tag                    = var.test_image_tag
     port                   = var.test_service_port
