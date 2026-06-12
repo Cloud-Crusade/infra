@@ -37,7 +37,7 @@ resource "aws_instance" "bastion" {
               # grafana compose 파일 생성
               mkdir -p /home/ec2-user/grafana
               cat > /home/ec2-user/grafana/docker-compose.yml <<'COMPOSE'
-              ${file("${path.module}/../compose/grafana/docker-compose.yml")}
+              ${file("${path.module}/compose/grafana/docker-compose.yml")}
               COMPOSE
 
               # grafana 실행
