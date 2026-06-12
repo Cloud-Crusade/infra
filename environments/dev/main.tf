@@ -148,36 +148,7 @@ module "eks" {
   access_entries = var.eks_access_entries
 }
 
-/** RDS / ElastiCache 추가 후 
-# SVC
-resource "kubernetes_service_v1" "rds" {
-  metadata {
-    name = "rds-svc"
-    namespace = "default"
-  }
-
-  spec {
-    type = "ExternalName"
-    external_name = var.rds_endpoint
-  }
-
-  depends_on = [module.rds]
-}
-
-resource "kubernetes_service_v1" "elasticache" {
-  metadata {
-    name = "elasticache-svc"
-    namespace = "default"
-  }
-
-  spec {
-    type = "ExternalName"
-    external_name = var.elasticache_endpoint
-  }
-
-  depends_on = [module.elasticache]
-}
-*/
+# RDS/ElastiCache 고정 DNS(ExternalName) 와 MSA 워크로드는 eks_*.tf 로 분리
 module "secrets_manager" {
   source                        = "../../modules/secrets_manager"
   project_name                  = var.project_name
