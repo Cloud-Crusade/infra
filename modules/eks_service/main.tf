@@ -135,6 +135,14 @@ resource "kubernetes_deployment_v1" "this" {
       }
     }
   }
+
+  # replicas 는 HPA, image 는 cc/app CD(kubectl set image) 가 소유 → terraform 드리프트 회피
+  lifecycle {
+    ignore_changes = [
+      spec[0].replicas,
+      spec[0].template[0].spec[0].container[0].image,
+    ]
+  }
 }
 
 # HTTP(ClusterIP) — NLB·내부 DNS 가 바인딩

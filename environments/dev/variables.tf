@@ -261,6 +261,12 @@ variable "eks_app_ng_max_size" {
   default = 3
 }
 
+variable "ticketing_image_tag" {
+  description = "EKS 워크로드 초기 이미지 태그 (이후 롤아웃은 cc/app CD 가 갱신 → image 변경은 terraform ignore)"
+  type        = string
+  default     = "latest"
+}
+
 variable "eks_access_entries" {
   type = list(object({
     principal_arn     = string
