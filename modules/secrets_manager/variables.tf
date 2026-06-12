@@ -8,8 +8,8 @@ variable "environment" {
   type        = string
 }
 
-variable "authorization_private_key_value" {
-  description = "authorization JWT 서명용 Private Key (PEM)"
+variable "authorization_secret_value" {
+  description = "authorization JWT 서명용 대칭 시크릿 (HS256)"
   type        = string
   sensitive   = true
   default     = ""
@@ -45,5 +45,12 @@ variable "core_writer_endpoint" {
 variable "reservation_writer_endpoint" {
   description = "예약(reservation) RDS Writer 엔드포인트 주소"
   type        = string
+  default     = ""
+}
+
+variable "captcha_hmac_secret_value" {
+  description = "캡차(ALTCHA PoW) 서명/검증용 HMAC 시크릿"
+  type        = string
+  sensitive   = true
   default     = ""
 }

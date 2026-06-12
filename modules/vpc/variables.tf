@@ -33,3 +33,9 @@ variable "enable_nat_gateway" {
   type        = bool
   default     = true
 }
+
+variable "enable_secretsmanager_endpoint" {
+  description = "VPC 내부 Lambda 의 Secrets Manager 접근용 인터페이스 엔드포인트 생성 여부(NAT 대체)"
+  type        = bool
+  default     = false
+}

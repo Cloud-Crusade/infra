@@ -4,20 +4,28 @@ locals {
 
 resource "aws_api_gateway_rest_api" "this" {
   name = "${local.name}-rest-api"
+
+  # 단일 리전 백엔드 + 같은 리전 ACM 사용 → REGIONAL (EDGE 의 us-east-1 인증서·이중 CloudFront 회피)
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
 }
 
-# 필수 파라미터(헤더) 검증기 — 예약 경로의 Reservation 헤더 누락을 통합 호출 전에 거부
-resource "aws_api_gateway_request_validator" "params" {
-  name                        = "${local.name}-params"
-  rest_api_id                 = aws_api_gateway_rest_api.this.id
-  validate_request_parameters = true
-  validate_request_body       = false
+# 예약 토큰(Reservation) RS256 서명 검증 Lambda authorizer
+# authorizer 람다가 S3 의 reservation 공개키로 서명 검증(공개키 위치는 authorizer 람다 env)
+# - Reservation 헤더 없음 → 403, 서명 무효 → 403, 유효 → 통과
+resource "aws_api_gateway_authorizer" "reservation" {
+  name            = "${local.name}-reservation-authorizer"
+  rest_api_id     = aws_api_gateway_rest_api.this.id
+  type            = "REQUEST"
+  authorizer_uri  = var.authorizer_lambda_invoke_arn
+  identity_source = "method.request.header.Reservation"
 }
 
-# 필수 파라미터 누락(기본 400)을 403 으로 변경 — "Reservation 헤더 없으면 403"
-resource "aws_api_gateway_gateway_response" "missing_params" {
+# Reservation 헤더 없음(identity source 누락 → 기본 401)을 403 으로 매핑
+resource "aws_api_gateway_gateway_response" "unauthorized" {
   rest_api_id   = aws_api_gateway_rest_api.this.id
-  response_type = "BAD_REQUEST_PARAMETERS"
+  response_type = "UNAUTHORIZED"
   status_code   = "403"
 }
 
@@ -29,12 +37,11 @@ resource "aws_api_gateway_resource" "reservations" {
 }
 
 resource "aws_api_gateway_method" "reservations" {
-  rest_api_id          = aws_api_gateway_rest_api.this.id
-  resource_id          = aws_api_gateway_resource.reservations.id
-  http_method          = "ANY"
-  authorization        = "NONE"
-  request_validator_id = aws_api_gateway_request_validator.params.id
-  request_parameters   = { "method.request.header.Reservation" = true }
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.reservations.id
+  http_method   = "ANY"
+  authorization = "CUSTOM"
+  authorizer_id = aws_api_gateway_authorizer.reservation.id
 }
 
 resource "aws_api_gateway_integration" "reservations" {
@@ -54,13 +61,12 @@ resource "aws_api_gateway_resource" "reservation_item" {
 }
 
 resource "aws_api_gateway_method" "reservation_item" {
-  rest_api_id          = aws_api_gateway_rest_api.this.id
-  resource_id          = aws_api_gateway_resource.reservation_item.id
-  http_method          = "ANY"
-  authorization        = "NONE"
-  request_validator_id = aws_api_gateway_request_validator.params.id
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.reservation_item.id
+  http_method   = "ANY"
+  authorization = "CUSTOM"
+  authorizer_id = aws_api_gateway_authorizer.reservation.id
   request_parameters = {
-    "method.request.header.Reservation"  = true
     "method.request.path.reservation_id" = true
   }
 }
@@ -106,6 +112,40 @@ resource "aws_api_gateway_integration" "queue" {
   uri                     = var.queue_lambda_invoke_arn
 }
 
+# ===== /captcha/challenge → captcha Lambda (ALTCHA PoW 챌린지 발급, 공개) =====
+# captcha Lambda 가 아직 배포(lambda-modules.txt 등록)되지 않았을 수 있어 옵션으로 둔다
+resource "aws_api_gateway_resource" "captcha" {
+  count       = var.enable_captcha_route ? 1 : 0
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_rest_api.this.root_resource_id
+  path_part   = "captcha"
+}
+
+resource "aws_api_gateway_resource" "captcha_challenge" {
+  count       = var.enable_captcha_route ? 1 : 0
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_resource.captcha[0].id
+  path_part   = "challenge"
+}
+
+resource "aws_api_gateway_method" "captcha_challenge" {
+  count         = var.enable_captcha_route ? 1 : 0
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.captcha_challenge[0].id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "captcha_challenge" {
+  count                   = var.enable_captcha_route ? 1 : 0
+  rest_api_id             = aws_api_gateway_rest_api.this.id
+  resource_id             = aws_api_gateway_resource.captcha_challenge[0].id
+  http_method             = aws_api_gateway_method.captcha_challenge[0].http_method
+  type                    = "AWS_PROXY"
+  integration_http_method = "POST"
+  uri                     = var.captcha_lambda_invoke_arn
+}
+
 # ===== 그 외 모든 경로(/{proxy+}) → app 백엔드(EKS). Authorization 은 EKS 가 판별 =====
 resource "aws_api_gateway_resource" "proxy" {
   rest_api_id = aws_api_gateway_rest_api.this.id
@@ -138,22 +178,42 @@ resource "aws_api_gateway_deployment" "this" {
   rest_api_id = aws_api_gateway_rest_api.this.id
 
   triggers = {
-    redeployment = sha1(jsonencode([
-      aws_api_gateway_method.reservations,
-      aws_api_gateway_integration.reservations,
-      aws_api_gateway_method.reservation_item,
-      aws_api_gateway_integration.reservation_item,
-      aws_api_gateway_method.queue,
-      aws_api_gateway_integration.queue,
-      aws_api_gateway_method.proxy,
-      aws_api_gateway_integration.proxy,
-      aws_api_gateway_gateway_response.missing_params,
-    ]))
+    redeployment = sha1(jsonencode(concat([
+      aws_api_gateway_method.reservations.id,
+      aws_api_gateway_integration.reservations.id,
+      aws_api_gateway_method.reservation_item.id,
+      aws_api_gateway_integration.reservation_item.id,
+      aws_api_gateway_method.queue.id,
+      aws_api_gateway_integration.queue.id,
+      aws_api_gateway_method.proxy.id,
+      aws_api_gateway_integration.proxy.id,
+      aws_api_gateway_authorizer.reservation.id,
+      aws_api_gateway_gateway_response.unauthorized.id,
+      aws_api_gateway_gateway_response.unauthorized.status_code,
+      ], var.enable_captcha_route ? [
+      aws_api_gateway_method.captcha_challenge[0].id,
+      aws_api_gateway_integration.captcha_challenge[0].id,
+    ] : [])))
   }
 
   lifecycle {
     create_before_destroy = true
   }
+
+  depends_on = [
+    aws_api_gateway_method.reservations,
+    aws_api_gateway_integration.reservations,
+    aws_api_gateway_method.reservation_item,
+    aws_api_gateway_integration.reservation_item,
+    aws_api_gateway_method.queue,
+    aws_api_gateway_integration.queue,
+    aws_api_gateway_method.captcha_challenge,
+    aws_api_gateway_integration.captcha_challenge,
+    aws_api_gateway_method.proxy,
+    aws_api_gateway_integration.proxy,
+    aws_api_gateway_authorizer.reservation,
+    aws_api_gateway_gateway_response.unauthorized
+  ]
 }
 
 resource "aws_api_gateway_stage" "this" {
@@ -169,4 +229,72 @@ resource "aws_lambda_permission" "queue" {
   function_name = var.queue_lambda_function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/*/*/queue/*"
+}
+
+# 게이트웨이 → captcha Lambda invoke 권한
+resource "aws_lambda_permission" "captcha" {
+  count         = var.enable_captcha_route ? 1 : 0
+  statement_id  = "AllowApiGatewayInvokeCaptcha"
+  action        = "lambda:InvokeFunction"
+  function_name = var.captcha_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/*/*/captcha/challenge"
+}
+
+# 게이트웨이 → authorizer Lambda invoke 권한
+resource "aws_lambda_permission" "authorizer" {
+  statement_id  = "AllowApiGatewayInvokeAuthorizer"
+  action        = "lambda:InvokeFunction"
+  function_name = var.authorizer_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/authorizers/${aws_api_gateway_authorizer.reservation.id}"
+}
+
+# ===== 커스텀 도메인 (api.<domain>) — REGIONAL + ACM(DNS 검증) =====
+resource "aws_acm_certificate" "api" {
+  domain_name       = var.api_domain_name
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ACM DNS 검증 레코드 — 기존 호스팅 영역에 생성
+resource "aws_route53_record" "api_cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.api.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      type   = dvo.resource_record_type
+      record = dvo.resource_record_value
+    }
+  }
+
+  zone_id         = var.route53_zone_id
+  name            = each.value.name
+  type            = each.value.type
+  records         = [each.value.record]
+  ttl             = 60
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "api" {
+  certificate_arn         = aws_acm_certificate.api.arn
+  validation_record_fqdns = [for r in aws_route53_record.api_cert_validation : r.fqdn]
+}
+
+resource "aws_api_gateway_domain_name" "api" {
+  domain_name              = var.api_domain_name
+  regional_certificate_arn = aws_acm_certificate_validation.api.certificate_arn
+
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+}
+
+# 커스텀 도메인 → 스테이지 매핑 (api.<domain>/ → stage 루트)
+resource "aws_api_gateway_base_path_mapping" "api" {
+  api_id      = aws_api_gateway_rest_api.this.id
+  stage_name  = aws_api_gateway_stage.this.stage_name
+  domain_name = aws_api_gateway_domain_name.api.domain_name
 }

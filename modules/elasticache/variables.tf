@@ -1,7 +1,12 @@
-# 기존 네트워크 및 인프라 연동 변수 
+# 기존 네트워크 및 인프라 연동 변수
 variable "subnet_group_name" {
   type        = string
-  description = "VPC ElastiCache 서브넷 그룹 이름"
+  description = "모듈이 생성할 ElastiCache 서브넷 그룹 이름"
+}
+
+variable "subnet_ids" {
+  type        = list(string)
+  description = "서브넷 그룹에 포함할 프라이빗 서브넷 ID 목록"
 }
 
 variable "main_cache_sg_id" {
@@ -85,4 +90,45 @@ variable "waiting_room_port" {
 variable "waiting_room_num_clusters" {
   type        = number
   description = "Waiting Room 캐시 노드 개수"
+}
+
+# Blacklist Cache (봇 탐지 기반 IP 블랙리스트 저장 및 조회용)
+variable "blacklist_sg_id" {
+  type        = string
+  description = "Blacklist Cache용 보안 그룹 ID"
+}
+
+variable "blacklist_replication_group_id" {
+  type        = string
+  description = "IP 블랙리스트 관리를 위한 캐시 리소스 식별 ID"
+}
+
+variable "blacklist_engine" {
+  type        = string
+  description = "Blacklist Cache에 사용할 Redis 엔진 타입"
+}
+
+variable "blacklist_engine_version" {
+  type        = string
+  description = "Blacklist Cache Redis 엔진 버전"
+}
+
+variable "blacklist_parameter_group_family" {
+  type        = string
+  description = "Blacklist Cache 파라미터 그룹 패밀리"
+}
+
+variable "blacklist_node_type" {
+  type        = string
+  description = "Blacklist Cache 인스턴스 사양"
+}
+
+variable "blacklist_port" {
+  type        = number
+  description = "Blacklist Cache 서비스 포트 번호"
+}
+
+variable "blacklist_num_clusters" {
+  type        = number
+  description = "Blacklist Cache 노드 개수"
 }
