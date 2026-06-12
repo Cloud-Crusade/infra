@@ -29,31 +29,20 @@ resource "aws_instance" "bastion" {
   user_data = <<-EOF
               #!/bin/bash
               dnf update -y
-              dnf install -y docker
+              dnf install -y docker docker-compose-plugin
               systemctl start docker
               systemctl enable docker
               usermod -aG docker ec2-user
 
-              # docker-compose 설치
-              curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-              chmod +x /usr/local/bin/docker-compose
-
               # grafana compose 파일 생성
               mkdir -p /home/ec2-user/grafana
               cat > /home/ec2-user/grafana/docker-compose.yml <<'COMPOSE'
-              version: '3.8'
-              services:
-                grafana:
-                  image: grafana/grafana
-                  container_name: grafana
-                  restart: always
-                  ports:
-                    - "3000:3000"
+              ${file("${path.root}/compose/grafana/docker-compose.yml")}
               COMPOSE
 
               # grafana 실행
               cd /home/ec2-user/grafana
-              docker-compose up -d
+              docker compose up -d
               EOF
 }
 
