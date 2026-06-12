@@ -860,7 +860,8 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          # CloudFront 지표는 글로벌 → CloudWatch us-east-1 에만 보고
+          region = "us-east-1"
           title  = "CloudFront Error Rate"
           metrics = var.cloudfront_distribution_id != "" ? [
             ["AWS/CloudFront", "5xxErrorRate", "DistributionId", var.cloudfront_distribution_id, "Region", "Global"],
