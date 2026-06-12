@@ -6,6 +6,7 @@ dnf install -y docker
 systemctl enable --now docker
 
 REGISTRY="${registry}"
+NAMESPACE="${namespace}"
 TAG="${tag}"
 
 # 서비스별 .env. auth/event → core RDS, reservation/payment → reservation RDS.
@@ -77,11 +78,11 @@ aws ecr get-login-password --region ${region} | docker login --username AWS --pa
 docker network create ticketing || true
 
 run_svc() { # name hostport
-  docker pull "$REGISTRY/ticketing-$1:$TAG"
+  docker pull "$REGISTRY/$NAMESPACE/$1:$TAG"
   docker run -d --restart always --name "$1" --network ticketing \
     -p "$2":8000 \
     -v /opt/"$1".env:/app/.env:ro \
-    "$REGISTRY/ticketing-$1:$TAG"
+    "$REGISTRY/$NAMESPACE/$1:$TAG"
 }
 
 # gRPC 서버(event·reservation) 먼저 → 클라이언트(reservation·payment) 기동

@@ -4,13 +4,13 @@
 # =========================================================
 
 variable "test_image_registry" {
-  description = "ECR 레지스트리 (예: <acct>.dkr.ecr.<region>.amazonaws.com). 서비스 이미지는 <registry>/ticketing-<svc>:<tag>. 실값은 GitHub var/tfvars 로 주입"
+  description = "ECR 레지스트리 override (예: <acct>.dkr.ecr.<region>.amazonaws.com). 미설정 시 본 구성의 ECR repo 에서 파생. 이미지는 <registry>/<namespace>/<svc>:<tag>"
   type        = string
   default     = ""
 }
 
 variable "test_image_tag" {
-  description = "ticketing-<svc> 이미지 태그"
+  description = "<namespace>/<svc> 이미지 태그"
   type        = string
   default     = "latest"
 }
@@ -146,8 +146,10 @@ resource "aws_instance" "test_service" {
   # docker 설치 → ECR 로그인 → 이미지 pull → run (.env 마운트)
   # 별도 템플릿 사용: HCL heredoc 들여쓰기로 shebang 이 깨져 cloud-init 미실행되던 문제 방지
   user_data = templatefile("${path.module}/templates/test_ec2_user_data.sh.tftpl", {
-    region                 = var.aws_region
-    registry               = var.test_image_registry
+    region = var.aws_region
+    # 기본은 본 구성의 ECR 레지스트리(ticketing repo 와 동일 계정) — 필요 시 var 로 override
+    registry               = var.test_image_registry != "" ? var.test_image_registry : split("/", aws_ecr_repository.ticketing["auth"].repository_url)[0]
+    namespace              = var.ecr_namespace
     tag                    = var.test_image_tag
     port                   = var.test_service_port
     core_writer_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_endpoint}/${var.db_name}"
