@@ -92,12 +92,14 @@ run_svc() { # name hostport
     "$REGISTRY/$NAMESPACE/$1:$TAG"
 }
 
-# gRPC 서버(event·reservation) 먼저 → 클라이언트(reservation·payment) 기동
+# 4서비스 동시 기동(이미지 병렬 pull) — gRPC 클라이언트는 lazy 연결이라 순서 무관.
 # 직접 디버깅 포트 = nginx 포트(BASE_PORT)+1..+4 (SG 인바운드 범위와 일치)
-run_svc event       $((BASE_PORT + 2))
-run_svc reservation $((BASE_PORT + 3))
-run_svc payment     $((BASE_PORT + 4))
-run_svc auth        $((BASE_PORT + 1))
+run_svc event       $((BASE_PORT + 2)) &
+run_svc reservation $((BASE_PORT + 3)) &
+run_svc payment     $((BASE_PORT + 4)) &
+run_svc auth        $((BASE_PORT + 1)) &
+# 한 서비스 실패가 set -e 로 nginx 기동을 막지 않게(fault-isolation)
+wait || true
 
 # nginx 게이트웨이(:${port}) — 경로별 서비스 라우팅(기존 API Gateway 백엔드 유지)
 cat > /opt/nginx.conf <<'NGINXEOF'
