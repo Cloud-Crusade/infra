@@ -68,7 +68,7 @@ variable "runtime" {
 variable "handler" {
   type        = string
   description = "Lambda 핸들러"
-  default     = "index.handler"
+  default     = "index.lambda_handler"
 }
 
 variable "timeout" {
