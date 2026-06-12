@@ -3,14 +3,20 @@
 # (임시 테스트 픽스처: 테스트 종료 후 이 파일만 제거하면 됨)
 # =========================================================
 
-variable "test_service_image" {
-  description = "ECR 서비스 이미지 URI (예: <acct>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>). 실값은 GitHub var/tfvars 로 주입"
+variable "test_image_registry" {
+  description = "ECR 레지스트리 (예: <acct>.dkr.ecr.<region>.amazonaws.com). 서비스 이미지는 <registry>/ticketing-<svc>:<tag>. 실값은 GitHub var/tfvars 로 주입"
   type        = string
   default     = ""
 }
 
+variable "test_image_tag" {
+  description = "ticketing-<svc> 이미지 태그"
+  type        = string
+  default     = "latest"
+}
+
 variable "test_service_port" {
-  description = "컨테이너 서비스 포트"
+  description = "nginx 게이트웨이 포트 (API Gateway 백엔드). 서비스 직접 포트는 +1..+4"
   type        = number
   default     = 8000
 }
@@ -93,10 +99,11 @@ resource "aws_security_group" "test_ec2" {
   description = "Test EC2 running ECR service image"
   vpc_id      = module.vpc.vpc_id
 
+  # nginx 게이트웨이(8000) + 서비스 직접 디버깅 포트(8001-8004)
   ingress {
-    description = "service port"
+    description = "nginx gateway + per-service debug ports"
     from_port   = var.test_service_port
-    to_port     = var.test_service_port
+    to_port     = var.test_service_port + 4
     protocol    = "tcp"
     cidr_blocks = var.test_service_ingress_cidrs
   }
@@ -140,10 +147,11 @@ resource "aws_instance" "test_service" {
   # 별도 템플릿 사용: HCL heredoc 들여쓰기로 shebang 이 깨져 cloud-init 미실행되던 문제 방지
   user_data = templatefile("${path.module}/templates/test_ec2_user_data.sh.tftpl", {
     region                 = var.aws_region
-    image                  = var.test_service_image
+    registry               = var.test_image_registry
+    tag                    = var.test_image_tag
     port                   = var.test_service_port
     core_writer_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_endpoint}/${var.db_name}"
-    core_reader_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_endpoint}/${var.db_name}"
+    core_reader_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_replica_endpoint}/${var.db_name}"
     reservation_writer_url = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_endpoint}/${var.db_name}"
     reservation_reader_url = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_replica_endpoint}/${var.db_name}"
     redis_url              = "redis://${module.elasticache.main_cache_endpoint}:6379/0"
