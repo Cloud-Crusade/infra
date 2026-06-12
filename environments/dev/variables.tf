@@ -60,10 +60,6 @@ variable "allowed_ssh_cidrs" {
 
 # ===== Bastion =====
 
-variable "bastion_ami" {
-  description = "Bastion Host AMI"
-  type        = string
-}
 
 variable "bastion_instance_type" {
   description = "Bastion host 인스턴스 타입"
