@@ -83,5 +83,5 @@ module "ticketing_service" {
 
   irsa_role_arn = each.key == "reservation" ? aws_iam_role.reservation_irsa.arn : ""
 
-  depends_on = [kubernetes_job_v1.db_bootstrap]
+  depends_on = [kubernetes_job_v1.migrate]
 }

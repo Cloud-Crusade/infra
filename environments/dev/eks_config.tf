@@ -19,7 +19,8 @@ resource "kubernetes_config_map_v1" "ticketing_config" {
     namespace = local.ticketing_namespace
   }
   data = {
-    ENV        = var.environment == "prod" ? "production" : "development"
+    # 클러스터에선 스키마를 alembic 이 소유(앱 자동 create_all 비활성) + JSON 로그(Fluent Bit→CloudWatch)
+    ENV        = "production"
     AWS_REGION = var.aws_region
 
     REDIS_URL                           = "redis://redis-main:6379/0"
