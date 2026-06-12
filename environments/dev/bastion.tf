@@ -39,17 +39,17 @@ resource "aws_instance" "bastion" {
   user_data = <<-EOF
 
                 # docker compsoe 설치
-       	        mkdir -p /usr/libexec/docker/cli-plugins/
-	              curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
-	              chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+                  mkdir -p /usr/libexec/docker/cli-plugins/
+                  curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
+                  chmod +x /usr/libexec/docker/cli-plugins/docker-compose
 
-                # k6 설치
-	              dnf install -y https://dl.k6.io/rpm/repo.rpm
-                dnf install -y k6 
+                  # k6 설치
+                  dnf install -y https://dl.k6.io/rpm/repo.rpm
+                  dnf install -y k6 
 
-                # stress 설치
-	              dnf install -y stress
-                EOF
+                  # stress 설치
+                  dnf install -y stress
+                  EOF
 }
 
 # bastion 개인키를 backend(state) 와 동일한 S3 버킷에 업로드 (팀 SSH 접근용)
