@@ -5,14 +5,21 @@ set -euxo pipefail
 dnf install -y docker
 systemctl enable --now docker
 
-cat > /opt/app.env <<'ENVEOF'
+REGISTRY="${registry}"
+NAMESPACE="${namespace}"
+TAG="${tag}"
+
+# 서비스별 .env. auth/event → core RDS, reservation/payment → reservation RDS.
+# ENV=development 이라 각 서비스가 기동 시 자기 테이블 create_all(별도 마이그레이션 불필요).
+# quoted heredoc — terraform 보간 변수만 치환하고 bash 확장은 차단(비밀번호 특수문자 안전)
+cat > /opt/auth.env <<'ENVEOF'
 ENV=development
 CORS_ALLOW_ORIGINS=["*"]
-CORE_WRITER_URL=${core_writer_url}
-CORE_READER_URL=${core_reader_url}
-RESERVATION_WRITER_URL=${reservation_writer_url}
-RESERVATION_READER_URL=${reservation_reader_url}
+DB_WRITER_URL=${core_writer_url}
+DB_READER_URL=${core_reader_url}
+DB_POOL_RECYCLE_SECONDS=1800
 REDIS_URL=${redis_url}
+REDIS_HEALTH_CHECK_INTERVAL_SECONDS=30
 JWT_SECRET=${jwt_secret}
 JWT_ACCESS_TTL_SECONDS=1800
 JWT_REFRESH_TTL_SECONDS=1209600
@@ -21,11 +28,97 @@ SQS_RESERVATION_QUEUE_URL=${sqs_queue_url}
 SEAT_HOLD_TTL_SECONDS=300
 CAPTCHA_ENABLED=${captcha_enabled}
 CAPTCHA_HMAC_SECRET=${captcha_hmac_secret}
+GRPC_PORT=50051
 ENVEOF
 
-# ECR 로그인 → 이미지 pull → 실행
-IMAGE="${image}"
-REGISTRY=$(echo "$IMAGE" | cut -d/ -f1)
+cp /opt/auth.env /opt/event.env
+
+cat > /opt/reservation.env <<'ENVEOF'
+ENV=development
+CORS_ALLOW_ORIGINS=["*"]
+DB_WRITER_URL=${reservation_writer_url}
+DB_READER_URL=${reservation_reader_url}
+DB_POOL_RECYCLE_SECONDS=1800
+REDIS_URL=${redis_url}
+REDIS_HEALTH_CHECK_INTERVAL_SECONDS=30
+JWT_SECRET=${jwt_secret}
+JWT_ACCESS_TTL_SECONDS=1800
+JWT_REFRESH_TTL_SECONDS=1209600
+AWS_REGION=${region}
+SQS_RESERVATION_QUEUE_URL=${sqs_queue_url}
+SEAT_HOLD_TTL_SECONDS=300
+CAPTCHA_ENABLED=${captcha_enabled}
+CAPTCHA_HMAC_SECRET=${captcha_hmac_secret}
+GRPC_PORT=50051
+EVENT_GRPC_TARGET=dns:///event:50051
+ENVEOF
+
+cat > /opt/payment.env <<'ENVEOF'
+ENV=development
+CORS_ALLOW_ORIGINS=["*"]
+DB_WRITER_URL=${reservation_writer_url}
+DB_READER_URL=${reservation_reader_url}
+DB_POOL_RECYCLE_SECONDS=1800
+REDIS_URL=${redis_url}
+REDIS_HEALTH_CHECK_INTERVAL_SECONDS=30
+JWT_SECRET=${jwt_secret}
+JWT_ACCESS_TTL_SECONDS=1800
+JWT_REFRESH_TTL_SECONDS=1209600
+AWS_REGION=${region}
+SQS_RESERVATION_QUEUE_URL=${sqs_queue_url}
+SEAT_HOLD_TTL_SECONDS=300
+CAPTCHA_ENABLED=${captcha_enabled}
+CAPTCHA_HMAC_SECRET=${captcha_hmac_secret}
+GRPC_PORT=50051
+RESERVATION_GRPC_TARGET=dns:///reservation:50051
+ENVEOF
+
+# .env 는 시크릿(JWT/HMAC/DB URL) 포함 → 소유자만 읽기
+chmod 600 /opt/auth.env /opt/event.env /opt/reservation.env /opt/payment.env
+
+# ECR 로그인 → 네트워크 생성(서비스명으로 상호 DNS·gRPC)
 aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin "$REGISTRY"
-docker pull "$IMAGE"
-docker run -d --restart always -p ${port}:${port} -v /opt/app.env:/app/.env:ro "$IMAGE"
+docker network create ticketing || true
+
+BASE_PORT=${port}
+
+run_svc() { # name hostport
+  # cloud-init 재시도·인스턴스 재사용 시 동일 이름 컨테이너 충돌 방지
+  docker rm -f "$1" 2>/dev/null || true
+  docker pull "$REGISTRY/$NAMESPACE/$1:$TAG"
+  docker run -d --restart always --name "$1" --network ticketing \
+    -p "$2":8000 \
+    -v /opt/"$1".env:/app/.env:ro \
+    "$REGISTRY/$NAMESPACE/$1:$TAG"
+}
+
+# gRPC 서버(event·reservation) 먼저 → 클라이언트(reservation·payment) 기동
+# 직접 디버깅 포트 = nginx 포트(BASE_PORT)+1..+4 (SG 인바운드 범위와 일치)
+run_svc event       $((BASE_PORT + 2))
+run_svc reservation $((BASE_PORT + 3))
+run_svc payment     $((BASE_PORT + 4))
+run_svc auth        $((BASE_PORT + 1))
+
+# nginx 게이트웨이(:${port}) — 경로별 서비스 라우팅(기존 API Gateway 백엔드 유지)
+cat > /opt/nginx.conf <<'NGINXEOF'
+events {}
+http {
+  server {
+    listen 80;
+    location /auth         { proxy_pass http://auth:8000; }
+    location /users        { proxy_pass http://auth:8000; }
+    location /events       { proxy_pass http://event:8000; }
+    location /reservations { proxy_pass http://reservation:8000; }
+    location /queue        { proxy_pass http://reservation:8000; }
+    location /captcha      { proxy_pass http://reservation:8000; }
+    location /payments     { proxy_pass http://payment:8000; }
+    location /             { proxy_pass http://auth:8000; }
+  }
+}
+NGINXEOF
+
+docker rm -f gateway 2>/dev/null || true
+docker run -d --restart always --name gateway --network ticketing \
+  -p ${port}:80 \
+  -v /opt/nginx.conf:/etc/nginx/nginx.conf:ro \
+  nginx:1.27-alpine
