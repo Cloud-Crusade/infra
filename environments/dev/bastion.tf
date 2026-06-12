@@ -48,7 +48,17 @@ resource "aws_instance" "bastion" {
                   dnf install -y k6 
 
                   # stress 설치
-                  dnf install -y stress
+                  dnf install -y stres
+            
+                  # grafana compose 파일 생성
+                  mkdir -p /home/ec2-user/grafana
+                  cat > /home/ec2-user/grafana/docker-compose.yml <<'COMPOSE'
+                  ${file("${path.module}/compose/grafana/docker-compose.yml")}
+                  COMPOSE
+
+                  # grafana 실행
+                  cd /home/ec2-user/grafana
+                  docker compose up -d
                   EOF
 }
 

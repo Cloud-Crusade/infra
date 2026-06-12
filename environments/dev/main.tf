@@ -53,6 +53,19 @@ module "vpc" {
   private_subnet_cidrs = var.private_subnet_cidrs
   availability_zones   = var.availability_zones
   enable_nat_gateway   = var.enable_nat_gateway
+  # VPC 내부 ticketing 람다가 NAT 없이 Secrets Manager 조회(인터페이스 엔드포인트)
+  enable_secretsmanager_endpoint = true
+}
+
+# SM 엔드포인트 인바운드(443) — 실제 SM 접근이 필요한 lambda SG 만 허용(최소권한, 모듈 순환 회피)
+resource "aws_security_group_rule" "sm_endpoint_from_lambda" {
+  type                     = "ingress"
+  security_group_id        = module.vpc.secretsmanager_endpoint_security_group_id
+  source_security_group_id = module.security_groups.lambda_sg_id
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  description              = "SM endpoint inbound from lambda SG"
 }
 
 module "security_groups" {
@@ -73,6 +86,7 @@ module "secrets_manager" {
   rds_password                  = var.db_password
   core_writer_endpoint          = module.rds.primary_endpoint
   reservation_writer_endpoint   = module.rds.reservation_endpoint
+  captcha_hmac_secret_value     = random_password.captcha_hmac.result
 }
 module "iam" {
   source            = "../../modules/iam"
@@ -154,14 +168,27 @@ module "lambda" {
     ticketing = {
       REDIS_HOST = module.elasticache.waiting_room_cache_endpoint
       REDIS_PORT = "6379"
-      # terraform 이 생성하는 예약 서명키(개인키) 주입 — 검증측은 S3 의 공개키 사용
-      JWT_SECRET = tls_private_key.reservation.private_key_pem
+      # 예약 서명키(RSA 개인키)는 값이 아닌 이름만 — 런타임에 Secrets 확장 캐시로 조회(VPC 엔드포인트 경유)
+      RESERVATION_SECRET_ID = module.secrets_manager.reservation_private_key_secret_arn
     }
     # 예약 토큰 서명 검증 authorizer — CloudFront 로 reservation 공개키 fetch(RS256 검증)
     # S3 직접 접근 대신 CloudFront URL → S3 IAM 불필요 + 접근 비용 절감
     authorizer = {
       PUBLIC_KEY_URL = "https://${module.cloudfront.cloudfront_domain_name}/jwt/${var.environment}/reservation/public_key.pem"
+      # Authorization 대칭키(HS256) — 값이 아닌 이름만, 런타임에 Secrets 확장 캐시로 조회
+      AUTHORIZATION_SECRET_ARN = module.secrets_manager.authorization_secret_arn
     }
+    # captcha — HMAC 시크릿은 값이 아닌 이름만 주입, 런타임에 Secrets 확장 캐시로 조회
+    captcha = {
+      CAPTCHA_SECRET_ID = "${var.environment}-captcha-hmac-secret"
+    }
+  }
+
+  # Secrets Manager 를 런타임 조회하는 Lambda 에 확장 레이어 부착 — 시크릿 캐시(호출 수·비용 절감)
+  layers = {
+    captcha    = [var.secrets_extension_layer_arn]
+    authorizer = [var.secrets_extension_layer_arn]
+    ticketing  = [var.secrets_extension_layer_arn]
   }
 }
 
@@ -174,6 +201,11 @@ module "apigateway" {
   reservation_backend_url    = "http://${aws_instance.test_service.public_dns}:${var.test_service_port}"
   queue_lambda_invoke_arn    = module.lambda.invoke_arns["ticketing"]
   queue_lambda_function_name = module.lambda.function_names["ticketing"]
+
+  # captcha Lambda 가 배포(lambda-modules.txt 등록)됐을 때만 라우트 생성 — 미배포 시 plan 실패 방지
+  enable_captcha_route         = contains(keys(module.lambda.function_names), "captcha")
+  captcha_lambda_invoke_arn    = lookup(module.lambda.invoke_arns, "captcha", "")
+  captcha_lambda_function_name = lookup(module.lambda.function_names, "captcha", "")
 
   authorizer_lambda_invoke_arn    = module.lambda.invoke_arns["authorizer"]
   authorizer_lambda_function_name = module.lambda.function_names["authorizer"]
@@ -206,6 +238,15 @@ module "elasticache" {
   waiting_room_port                   = 6379
   waiting_room_num_clusters           = 1
   waiting_room_sg_id                  = module.security_groups.cache_sg_id
+
+  blacklist_replication_group_id   = "${var.project_name}-${var.environment}-blacklist"
+  blacklist_engine                 = "redis"
+  blacklist_engine_version         = "7.1"
+  blacklist_parameter_group_family = "redis7"
+  blacklist_node_type              = "cache.t3.micro"
+  blacklist_port                   = 6379
+  blacklist_num_clusters           = 1
+  blacklist_sg_id                  = module.security_groups.cache_sg_id
 }
 
 # Route53 레코드 — www → CloudFront(클라이언트), api → ALB(서버)
@@ -223,4 +264,61 @@ module "route53" {
   # api → API Gateway 커스텀 도메인 (REGIONAL)
   api_target_dns_name = module.apigateway.domain_regional_target
   api_target_zone_id  = module.apigateway.domain_regional_zone_id
+}
+module "cloudwatch" {
+  source = "../../modules/cloudwatch"
+
+  project_name = var.project_name
+  environment  = var.environment
+  alarm_email  = var.alarm_email
+
+  # RDS
+  rds_instance_ids = [
+    "${var.project_name}-${var.environment}-primary",
+    "${var.project_name}-${var.environment}-primary-replica",
+    "${var.project_name}-${var.environment}-reservation",
+    "${var.project_name}-${var.environment}-reservation-replica",
+    "${var.project_name}-${var.environment}-reservation-replica-2",
+  ]
+
+  # Lambda
+  lambda_function_names = [
+    module.lambda.function_names["authorizer"],
+    module.lambda.function_names["ticketing"],
+    module.lambda.function_names["persistence"],
+  ]
+
+  # CloudFront
+  cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
+
+  # ElastiCache
+  elasticache_cluster_ids = [
+    module.elasticache.main_cache_cluster_id,
+    module.elasticache.waiting_room_cache_cluster_id,
+  ]
+
+  # SQS
+  sqs_queue_names = [module.sqs.queue_name]
+
+  # EKS (틀만 — 모듈 연결 후 활성화)
+  eks_cluster_name = ""
+
+  # API Gateway (틀만 — 모듈 연결 후 활성화)
+  api_gateway_name = ""
+}
+
+module "prometheus" {
+  source = "../../modules/prometheus"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  # EKS (틀만 — 모듈 연결 후 활성화)
+  eks_cluster_name = ""
+}
+module "eventbridge" {
+  source = "../../modules/eventbridge"
+
+  project_name = var.project_name
+  environment  = var.environment
 }

@@ -29,6 +29,9 @@ resource "aws_lambda_function" "this" {
   handler       = var.handler
   timeout       = var.timeout
 
+  # 모듈별 Lambda Layer (예: captcha 의 Secrets 확장 레이어 — 런타임 시크릿 캐시 조회)
+  layers = lookup(var.layers, each.key, null)
+
   # 코드: S3 zip (lambda/<module>.zip)
   s3_bucket = var.artifact_bucket
   s3_key    = "${var.artifact_prefix}${each.key}.zip"

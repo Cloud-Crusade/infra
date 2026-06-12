@@ -148,6 +148,8 @@ resource "aws_instance" "test_service" {
     reservation_reader_url = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_replica_endpoint}/${var.db_name}"
     redis_url              = "redis://${module.elasticache.main_cache_endpoint}:6379/0"
     jwt_secret             = random_password.authorization.result
+    captcha_enabled        = var.captcha_enabled
+    captcha_hmac_secret    = random_password.captcha_hmac.result
     sqs_queue_url          = module.sqs.queue_url
   })
 
