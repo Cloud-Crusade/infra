@@ -43,6 +43,20 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
+  # SPA 딥링크 fallback — S3 REST 오리진은 객체 없으면 403(AccessDenied) 반환.
+  # 클라이언트 라우트 새로고침이 index.html 로 떨어지도록 200 으로 재매핑.
+  custom_error_response {
+    error_code         = 403
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
+  custom_error_response {
+    error_code         = 404
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
   # 접근 제한 없음 (전체 공개)
   restrictions {
     geo_restriction {
