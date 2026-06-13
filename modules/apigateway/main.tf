@@ -38,31 +38,51 @@ resource "aws_api_gateway_gateway_response" "access_denied" {
   response_parameters = local.gateway_cors_headers
 }
 
-# ===== /reservations (Reservation 헤더 필수) =====
+# ===== /reservations =====
+# 대기열 입장 토큰(Reservation)은 스파이크 경로인 예매 진입(POST 생성)에만 게이트한다.
+# 확인(GET)·취소(DELETE)는 access 토큰만 필요(백엔드 getCurrentUserId 가 인증) → authorization=NONE 으로 프록시.
 resource "aws_api_gateway_resource" "reservations" {
   rest_api_id = aws_api_gateway_rest_api.this.id
   parent_id   = aws_api_gateway_rest_api.this.root_resource_id
   path_part   = "reservations"
 }
 
-resource "aws_api_gateway_method" "reservations" {
+# POST 생성 — 입장 토큰 게이트
+resource "aws_api_gateway_method" "reservations_post" {
   rest_api_id   = aws_api_gateway_rest_api.this.id
   resource_id   = aws_api_gateway_resource.reservations.id
-  http_method   = "ANY"
+  http_method   = "POST"
   authorization = "CUSTOM"
   authorizer_id = aws_api_gateway_authorizer.reservation.id
 }
 
-resource "aws_api_gateway_integration" "reservations" {
+resource "aws_api_gateway_integration" "reservations_post" {
   rest_api_id             = aws_api_gateway_rest_api.this.id
   resource_id             = aws_api_gateway_resource.reservations.id
-  http_method             = aws_api_gateway_method.reservations.http_method
+  http_method             = aws_api_gateway_method.reservations_post.http_method
   type                    = "HTTP_PROXY"
-  integration_http_method = "ANY"
+  integration_http_method = "POST"
   uri                     = "${var.reservation_backend_url}/reservations"
 }
 
-# ===== /reservations/{reservation_id} (Reservation 헤더 필수) =====
+# GET 목록 — 확인은 access 토큰만(입장 토큰 불필요)
+resource "aws_api_gateway_method" "reservations_get" {
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.reservations.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "reservations_get" {
+  rest_api_id             = aws_api_gateway_rest_api.this.id
+  resource_id             = aws_api_gateway_resource.reservations.id
+  http_method             = aws_api_gateway_method.reservations_get.http_method
+  type                    = "HTTP_PROXY"
+  integration_http_method = "GET"
+  uri                     = "${var.reservation_backend_url}/reservations"
+}
+
+# ===== /reservations/{reservation_id} — 확인(GET)·취소(DELETE): access 토큰만 =====
 resource "aws_api_gateway_resource" "reservation_item" {
   rest_api_id = aws_api_gateway_rest_api.this.id
   parent_id   = aws_api_gateway_resource.reservations.id
@@ -70,22 +90,23 @@ resource "aws_api_gateway_resource" "reservation_item" {
 }
 
 resource "aws_api_gateway_method" "reservation_item" {
+  for_each      = toset(["GET", "DELETE"])
   rest_api_id   = aws_api_gateway_rest_api.this.id
   resource_id   = aws_api_gateway_resource.reservation_item.id
-  http_method   = "ANY"
-  authorization = "CUSTOM"
-  authorizer_id = aws_api_gateway_authorizer.reservation.id
+  http_method   = each.value
+  authorization = "NONE"
   request_parameters = {
     "method.request.path.reservation_id" = true
   }
 }
 
 resource "aws_api_gateway_integration" "reservation_item" {
+  for_each                = aws_api_gateway_method.reservation_item
   rest_api_id             = aws_api_gateway_rest_api.this.id
   resource_id             = aws_api_gateway_resource.reservation_item.id
-  http_method             = aws_api_gateway_method.reservation_item.http_method
+  http_method             = each.value.http_method
   type                    = "HTTP_PROXY"
-  integration_http_method = "ANY"
+  integration_http_method = each.value.http_method
   uri                     = "${var.reservation_backend_url}/reservations/{reservation_id}"
   request_parameters = {
     "integration.request.path.reservation_id" = "method.request.path.reservation_id"
@@ -93,8 +114,8 @@ resource "aws_api_gateway_integration" "reservation_item" {
 }
 
 # ===== /reservations* CORS 프리플라이트 =====
-# CUSTOM authorizer(identity=Reservation 헤더)는 프리플라이트(헤더 없음)를 거부 → OPTIONS 는
-# authorization=NONE + MOCK 으로 분리해 CORS 헤더만 반환. 실제 메서드는 위 ANY(CUSTOM) 처리.
+# 명시 리소스라 OPTIONS 를 직접 정의해야 함. authorization=NONE + MOCK 으로 CORS 헤더만 반환
+# (POST 의 CUSTOM authorizer 는 프리플라이트(헤더 없음)를 거부하므로 OPTIONS 를 분리).
 locals {
   cors_resources = {
     reservations     = aws_api_gateway_resource.reservations.id
@@ -252,10 +273,10 @@ resource "aws_api_gateway_deployment" "this" {
 
   triggers = {
     redeployment = sha1(jsonencode(concat([
-      aws_api_gateway_method.reservations.id,
-      aws_api_gateway_integration.reservations.id,
-      aws_api_gateway_method.reservation_item.id,
-      aws_api_gateway_integration.reservation_item.id,
+      aws_api_gateway_method.reservations_post.id,
+      aws_api_gateway_integration.reservations_post.id,
+      aws_api_gateway_method.reservations_get.id,
+      aws_api_gateway_integration.reservations_get.id,
       aws_api_gateway_method.queue.id,
       aws_api_gateway_integration.queue.id,
       aws_api_gateway_method.proxy.id,
@@ -268,6 +289,8 @@ resource "aws_api_gateway_deployment" "this" {
       jsonencode(local.cors_response_headers),
       jsonencode(local.gateway_cors_headers),
       ],
+      values(aws_api_gateway_method.reservation_item)[*].id,
+      values(aws_api_gateway_integration.reservation_item)[*].id,
       values(aws_api_gateway_method.cors)[*].id,
       values(aws_api_gateway_integration.cors)[*].id,
       values(aws_api_gateway_integration_response.cors)[*].status_code,
@@ -282,8 +305,10 @@ resource "aws_api_gateway_deployment" "this" {
   }
 
   depends_on = [
-    aws_api_gateway_method.reservations,
-    aws_api_gateway_integration.reservations,
+    aws_api_gateway_method.reservations_post,
+    aws_api_gateway_integration.reservations_post,
+    aws_api_gateway_method.reservations_get,
+    aws_api_gateway_integration.reservations_get,
     aws_api_gateway_method.reservation_item,
     aws_api_gateway_integration.reservation_item,
     aws_api_gateway_method.cors,
