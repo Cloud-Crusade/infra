@@ -83,6 +83,62 @@ resource "aws_api_gateway_integration" "reservation_item" {
   }
 }
 
+# ===== /reservations* CORS 프리플라이트 =====
+# CUSTOM authorizer(identity=Reservation 헤더)는 프리플라이트(헤더 없음)를 거부 → OPTIONS 는
+# authorization=NONE + MOCK 으로 분리해 CORS 헤더만 반환. 실제 메서드는 위 ANY(CUSTOM) 처리.
+locals {
+  cors_resources = {
+    reservations     = aws_api_gateway_resource.reservations.id
+    reservation_item = aws_api_gateway_resource.reservation_item.id
+  }
+}
+
+resource "aws_api_gateway_method" "cors" {
+  for_each      = local.cors_resources
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = each.value
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "cors" {
+  for_each          = local.cors_resources
+  rest_api_id       = aws_api_gateway_rest_api.this.id
+  resource_id       = each.value
+  http_method       = aws_api_gateway_method.cors[each.key].http_method
+  type              = "MOCK"
+  request_templates = { "application/json" = "{\"statusCode\": 200}" }
+}
+
+resource "aws_api_gateway_method_response" "cors" {
+  for_each    = local.cors_resources
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  resource_id = each.value
+  http_method = aws_api_gateway_method.cors[each.key].http_method
+  status_code = "200"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Max-Age"       = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "cors" {
+  for_each    = local.cors_resources
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  resource_id = each.value
+  http_method = aws_api_gateway_method.cors[each.key].http_method
+  status_code = aws_api_gateway_method_response.cors[each.key].status_code
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Reservation,Content-Type'"
+    "method.response.header.Access-Control-Max-Age"       = "'600'"
+  }
+  depends_on = [aws_api_gateway_integration.cors]
+}
+
 # ===== /queue/{event_id} → queue Lambda =====
 resource "aws_api_gateway_resource" "queue" {
   rest_api_id = aws_api_gateway_rest_api.this.id
@@ -190,9 +246,13 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_authorizer.reservation.id,
       aws_api_gateway_gateway_response.unauthorized.id,
       aws_api_gateway_gateway_response.unauthorized.status_code,
-      ], var.enable_captcha_route ? [
-      aws_api_gateway_method.captcha_challenge[0].id,
-      aws_api_gateway_integration.captcha_challenge[0].id,
+      ],
+      values(aws_api_gateway_method.cors)[*].id,
+      values(aws_api_gateway_integration.cors)[*].id,
+      values(aws_api_gateway_integration_response.cors)[*].status_code,
+      var.enable_captcha_route ? [
+        aws_api_gateway_method.captcha_challenge[0].id,
+        aws_api_gateway_integration.captcha_challenge[0].id,
     ] : [])))
   }
 
@@ -205,6 +265,9 @@ resource "aws_api_gateway_deployment" "this" {
     aws_api_gateway_integration.reservations,
     aws_api_gateway_method.reservation_item,
     aws_api_gateway_integration.reservation_item,
+    aws_api_gateway_method.cors,
+    aws_api_gateway_integration.cors,
+    aws_api_gateway_integration_response.cors,
     aws_api_gateway_method.queue,
     aws_api_gateway_integration.queue,
     aws_api_gateway_method.captcha_challenge,
