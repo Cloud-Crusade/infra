@@ -22,11 +22,20 @@ resource "aws_api_gateway_authorizer" "reservation" {
   identity_source = "method.request.header.Reservation"
 }
 
-# Reservation 헤더 없음(identity source 누락 → 기본 401)을 403 으로 매핑
+# authorizer 거부 응답. 헤더 누락 → UNAUTHORIZED(403 매핑), 서명무효·만료·불일치 → Deny → ACCESS_DENIED(403).
+# 둘 다 CORS 헤더를 실어 브라우저가 4xx 를 읽고 클라이언트가 토큰 정리·재대기열 가능하게 한다.
 resource "aws_api_gateway_gateway_response" "unauthorized" {
-  rest_api_id   = aws_api_gateway_rest_api.this.id
-  response_type = "UNAUTHORIZED"
-  status_code   = "403"
+  rest_api_id         = aws_api_gateway_rest_api.this.id
+  response_type       = "UNAUTHORIZED"
+  status_code         = "403"
+  response_parameters = local.gateway_cors_headers
+}
+
+resource "aws_api_gateway_gateway_response" "access_denied" {
+  rest_api_id         = aws_api_gateway_rest_api.this.id
+  response_type       = "ACCESS_DENIED"
+  status_code         = "403"
+  response_parameters = local.gateway_cors_headers
 }
 
 # ===== /reservations (Reservation 헤더 필수) =====
@@ -97,6 +106,12 @@ locals {
     "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
     "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Reservation,Content-Type'"
     "method.response.header.Access-Control-Max-Age"       = "'600'"
+  }
+  # authorizer 거부(4xx) 응답용 CORS 헤더 — 위 값을 gatewayresponse 접두사로 재사용(Max-Age 는 에러응답 불필요라 제외)
+  gateway_cors_headers = {
+    for key, value in local.cors_response_headers :
+    replace(key, "method.response.header.", "gatewayresponse.header.") => value
+    if !endswith(key, "Max-Age")
   }
 }
 
@@ -248,7 +263,10 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_authorizer.reservation.id,
       aws_api_gateway_gateway_response.unauthorized.id,
       aws_api_gateway_gateway_response.unauthorized.status_code,
+      aws_api_gateway_gateway_response.access_denied.id,
+      aws_api_gateway_gateway_response.access_denied.status_code,
       jsonencode(local.cors_response_headers),
+      jsonencode(local.gateway_cors_headers),
       ],
       values(aws_api_gateway_method.cors)[*].id,
       values(aws_api_gateway_integration.cors)[*].id,
@@ -279,7 +297,8 @@ resource "aws_api_gateway_deployment" "this" {
     aws_api_gateway_method.proxy,
     aws_api_gateway_integration.proxy,
     aws_api_gateway_authorizer.reservation,
-    aws_api_gateway_gateway_response.unauthorized
+    aws_api_gateway_gateway_response.unauthorized,
+    aws_api_gateway_gateway_response.access_denied
   ]
 }
 
