@@ -104,7 +104,7 @@ locals {
   cors_response_headers = {
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Reservation,Content-Type'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Reservation,Content-Type,X-Captcha-Token'"
     "method.response.header.Access-Control-Max-Age"       = "'600'"
   }
   # authorizer 거부(4xx) 응답용 CORS 헤더 — 위 값을 gatewayresponse 접두사로 재사용(Max-Age 는 에러응답 불필요라 제외)
