@@ -43,6 +43,16 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
+  # SPA 딥링크 fallback — S3 REST 오리진은 객체 없으면 403 반환 → index.html(200) 재매핑.
+  # 404 는 매핑하지 않아 실제 누락 에셋(.js 등)이 HTML 로 가려지지 않게 한다.
+  # error_caching_min_ttl=0: 에러 응답이 캐시돼 롤백/배포 반영이 지연되지 않도록.
+  custom_error_response {
+    error_code            = 403
+    response_code         = 200
+    response_page_path    = "/index.html"
+    error_caching_min_ttl = 0
+  }
+
   # 접근 제한 없음 (전체 공개)
   restrictions {
     geo_restriction {
