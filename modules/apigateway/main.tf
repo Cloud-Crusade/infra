@@ -91,6 +91,13 @@ locals {
     reservations     = aws_api_gateway_resource.reservations.id
     reservation_item = aws_api_gateway_resource.reservation_item.id
   }
+  # 헤더 값을 한 곳에서 정의 → integration_response 와 배포 트리거가 같은 출처 참조(값 변경 시 재배포)
+  cors_response_headers = {
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Reservation,Content-Type'"
+    "method.response.header.Access-Control-Max-Age"       = "'600'"
+  }
 }
 
 resource "aws_api_gateway_method" "cors" {
@@ -125,18 +132,13 @@ resource "aws_api_gateway_method_response" "cors" {
 }
 
 resource "aws_api_gateway_integration_response" "cors" {
-  for_each    = local.cors_resources
-  rest_api_id = aws_api_gateway_rest_api.this.id
-  resource_id = each.value
-  http_method = aws_api_gateway_method.cors[each.key].http_method
-  status_code = aws_api_gateway_method_response.cors[each.key].status_code
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Reservation,Content-Type'"
-    "method.response.header.Access-Control-Max-Age"       = "'600'"
-  }
-  depends_on = [aws_api_gateway_integration.cors]
+  for_each            = local.cors_resources
+  rest_api_id         = aws_api_gateway_rest_api.this.id
+  resource_id         = each.value
+  http_method         = aws_api_gateway_method.cors[each.key].http_method
+  status_code         = aws_api_gateway_method_response.cors[each.key].status_code
+  response_parameters = local.cors_response_headers
+  depends_on          = [aws_api_gateway_integration.cors]
 }
 
 # ===== /queue/{event_id} → queue Lambda =====
@@ -246,6 +248,7 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_authorizer.reservation.id,
       aws_api_gateway_gateway_response.unauthorized.id,
       aws_api_gateway_gateway_response.unauthorized.status_code,
+      jsonencode(local.cors_response_headers),
       ],
       values(aws_api_gateway_method.cors)[*].id,
       values(aws_api_gateway_integration.cors)[*].id,
@@ -267,6 +270,7 @@ resource "aws_api_gateway_deployment" "this" {
     aws_api_gateway_integration.reservation_item,
     aws_api_gateway_method.cors,
     aws_api_gateway_integration.cors,
+    aws_api_gateway_method_response.cors,
     aws_api_gateway_integration_response.cors,
     aws_api_gateway_method.queue,
     aws_api_gateway_integration.queue,
