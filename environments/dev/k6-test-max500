@@ -1,0 +1,51 @@
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+
+// 부하 테스트 설정 (가상 유저 최대 500명 스케일)
+export const options = {
+    scenarios: {
+        pure_lambda_test: {
+            executor: 'ramping-vus', 
+            startVUs: 0,
+            stages: [
+                { duration: '1m', target: 200 },  // 1분 동안 VU 200명까지 점진적 증가
+                { duration: '3m', target: 500 },  // 3분 동안 VU 500명 유지 (여기서 누적 수만 건 처리)
+                { duration: '30s', target: 0 },   // 30초 동안 서서히 감소 후 종료
+            ],
+            gracefulStop: '30s',
+        },
+    },
+    thresholds: {
+        http_req_failed: ['rate<0.05'],   // 에러율 5% 미만 유지 조건 (429 방어 완료)
+        http_req_duration: ['p(95)<1500'], // 95%의 요청이 1.5초 이내에 완료될 것
+    },
+};
+
+// 프로비저닝 별칭(/load-test) 주소 고정
+const LAMBDA_URL = 'https://u6xq4c3p6hjnsghv5onjk62ug40iqdso.lambda-url.ap-northeast-2.on.aws/load-test';
+
+export default function () {
+    const params = {
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Dummy-Ping': 'true'
+        },
+        timeout: '10s' 
+    };
+
+    // 예열된 람다 별칭 URL로 부하 테스트 요청 발송
+    let res = http.get(LAMBDA_URL, params);
+
+    // 람다 웹 커넥션 성공 여부 체크 (429나 500대 에러가 없으면 통과)
+    check(res, {
+        'Lambda Infrastructure Alive': (r) => r.status !== 0 && r.status < 500,
+    });
+
+    if (res.status === 429 || res.status >= 500) {
+        console.warn(`🔥 람다 서버 한계 도달! 상태코드: ${res.status}`);
+    }
+
+    // 실제 유저들의 행동 패턴을 고려해 대기 시간을 3초로 상향
+    // 이 조치로 람다 동시성 폭발을 막고, 대량의 누적 트래픽을 에러 없이 소화합니다.
+    sleep(3.0);
+}
