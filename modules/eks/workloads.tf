@@ -9,10 +9,13 @@ locals {
   db_reservation_reader_host = split(":", var.rds_reservation_reader_endpoint)[0]
   redis_main_host            = var.redis_main_endpoint
 
+  # gRPC 포트 단일 소스 — ConfigMap·클라이언트 타깃·service 모듈이 공유
+  grpc_port = 50051
+
   # gRPC 클라이언트 타깃 (headless Service + dns:/// round_robin)
   svc_grpc_targets = {
-    reservation = { EVENT_GRPC_TARGET = "dns:///event-grpc:50051" }
-    payment     = { RESERVATION_GRPC_TARGET = "dns:///reservation-grpc:50051" }
+    reservation = { EVENT_GRPC_TARGET = "dns:///event-grpc:${local.grpc_port}" }
+    payment     = { RESERVATION_GRPC_TARGET = "dns:///reservation-grpc:${local.grpc_port}" }
   }
 }
 
@@ -52,7 +55,7 @@ resource "kubernetes_config_map_v1" "ticketing_config" {
 
     SQS_RESERVATION_QUEUE_URL = var.sqs_queue_url
 
-    GRPC_PORT          = "50051"
+    GRPC_PORT          = tostring(local.grpc_port)
     CAPTCHA_ENABLED    = tostring(var.captcha_enabled)
     CORS_ALLOW_ORIGINS = jsonencode(["https://www.${var.domain_name}"])
   }
@@ -170,6 +173,7 @@ module "ticketing_service" {
   max_replicas = 3
 
   grpc_enabled = contains(["event", "reservation"], each.key)
+  grpc_port    = local.grpc_port
 
   config_map_refs = [kubernetes_config_map_v1.ticketing_config.metadata[0].name]
   secret_refs = [
