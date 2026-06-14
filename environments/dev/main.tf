@@ -411,6 +411,14 @@ module "cloudwatch" {
   api_gateway_name = ""
 }
 
+module "nlb" {
+  source = "../../modules/nlb"
+
+  project_name = var.project_name
+  environment  = var.environment
+  subnet_ids   = module.vpc.private_subnet_ids
+}
+
 module "prometheus" {
   source = "../../modules/prometheus"
 
@@ -420,6 +428,7 @@ module "prometheus" {
   # EKS (틀만 — 모듈 연결 후 활성화)
   eks_cluster_name = ""
 }
+
 module "eventbridge" {
   source = "../../modules/eventbridge"
 
