@@ -1,3 +1,6 @@
+# 대시보드 metric 위젯 region 지정용
+data "aws_region" "current" {}
+
 # ===== SNS 토픽 =====
 
 resource "aws_sns_topic" "alarm" {
@@ -376,10 +379,438 @@ resource "aws_cloudwatch_dashboard" "main" {
 
   dashboard_body = jsonencode({
     widgets = [
-      # Lambda 에러
+      # SQS
       {
-        type = "metric"
+        type   = "metric"
+        x      = 0
+        y      = 0
+        width  = 8
+        height = 6
+
         properties = {
+          region  = data.aws_region.current.name
+          title   = "SQS Queue Depth"
+          metrics = [for q in var.sqs_queue_names : ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", q]]
+          period  = 300
+          stat    = "Average"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 8
+        y      = 0
+        width  = 8
+        height = 6
+
+        properties = {
+          region  = data.aws_region.current.name
+          title   = "SQS Oldest Message"
+          metrics = [for q in var.sqs_queue_names : ["AWS/SQS", "ApproximateAgeOfOldestMessage", "QueueName", q]]
+          period  = 300
+          stat    = "Maximum"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 16
+        y      = 0
+        width  = 8
+        height = 6
+
+        properties = {
+          region  = data.aws_region.current.name
+          title   = "SQS Messages Received"
+          metrics = [for q in var.sqs_queue_names : ["AWS/SQS", "NumberOfMessagesReceived", "QueueName", q]]
+          period  = 300
+          stat    = "Sum"
+          view    = "timeSeries"
+        }
+      },
+
+      # ElastiCache CPU
+      {
+        type   = "metric"
+        x      = 0
+        y      = 6
+        width  = 12
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Main Cache CPU"
+
+          metrics = [
+            ["AWS/ElastiCache", "EngineCPUUtilization", "CacheClusterId", var.elasticache_cluster_ids[0], "CacheNodeId", "0001"]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 6
+        width  = 12
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Waiting Room Cache CPU"
+
+          metrics = [
+            ["AWS/ElastiCache", "EngineCPUUtilization", "CacheClusterId", var.elasticache_cluster_ids[1], "CacheNodeId", "0001"]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+
+      # ElastiCache Connections
+      {
+        type   = "metric"
+        x      = 0
+        y      = 12
+        width  = 12
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Main Cache Connections"
+
+          metrics = [
+            ["AWS/ElastiCache", "CurrConnections", "CacheClusterId", var.elasticache_cluster_ids[0], "CacheNodeId", "0001"]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 12
+        width  = 12
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Waiting Room Cache Connections"
+
+          metrics = [
+            ["AWS/ElastiCache", "CurrConnections", "CacheClusterId", var.elasticache_cluster_ids[1], "CacheNodeId", "0001"]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+
+      # ElastiCache 통합 지표
+      {
+        type   = "metric"
+        x      = 0
+        y      = 18
+        width  = 12
+        height = 6
+
+        properties = {
+          region  = data.aws_region.current.name
+          title   = "ElastiCache Memory Usage"
+          metrics = [for id in var.elasticache_cluster_ids : ["AWS/ElastiCache", "DatabaseMemoryUsagePercentage", "CacheClusterId", id, "CacheNodeId", "0001"]]
+          period  = 300
+          stat    = "Average"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 18
+        width  = 12
+        height = 6
+
+        properties = {
+          region  = data.aws_region.current.name
+          title   = "ElastiCache Evictions"
+          metrics = [for id in var.elasticache_cluster_ids : ["AWS/ElastiCache", "Evictions", "CacheClusterId", id, "CacheNodeId", "0001"]]
+          period  = 300
+          stat    = "Sum"
+          view    = "timeSeries"
+        }
+      },
+
+      # RDS CPU
+      {
+        type   = "metric"
+        x      = 0
+        y      = 24
+        width  = 8
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Primary DB CPU"
+
+          metrics = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", var.rds_instance_ids[0]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 8
+        y      = 24
+        width  = 8
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Primary Replica DB CPU"
+
+          metrics = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", var.rds_instance_ids[1]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 16
+        y      = 24
+        width  = 8
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Reservation DB CPU"
+
+          metrics = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", var.rds_instance_ids[2]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 30
+        width  = 12
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Reservation Replica DB CPU"
+
+          metrics = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", var.rds_instance_ids[3]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 30
+        width  = 12
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Reservation Replica 2 DB CPU"
+
+          metrics = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", var.rds_instance_ids[4]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+
+      # RDS Connections
+      {
+        type   = "metric"
+        x      = 0
+        y      = 36
+        width  = 8
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Primary DB Connections"
+
+          metrics = [
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_instance_ids[0]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 8
+        y      = 36
+        width  = 8
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Primary Replica DB Connections"
+
+          metrics = [
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_instance_ids[1]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 16
+        y      = 36
+        width  = 8
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Reservation DB Connections"
+
+          metrics = [
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_instance_ids[2]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 42
+        width  = 12
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Reservation Replica DB Connections"
+
+          metrics = [
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_instance_ids[3]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 42
+        width  = 12
+        height = 6
+
+        properties = {
+          region = data.aws_region.current.name
+          title  = "Reservation Replica 2 DB Connections"
+
+          metrics = [
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", var.rds_instance_ids[4]]
+          ]
+
+          period = 300
+          stat   = "Average"
+          view   = "timeSeries"
+        }
+      },
+
+      # RDS Latency
+      {
+        type   = "metric"
+        x      = 0
+        y      = 48
+        width  = 12
+        height = 6
+
+        properties = {
+          region  = data.aws_region.current.name
+          title   = "RDS Read Latency"
+          metrics = [for id in var.rds_instance_ids : ["AWS/RDS", "ReadLatency", "DBInstanceIdentifier", id]]
+          period  = 300
+          stat    = "Average"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 48
+        width  = 12
+        height = 6
+
+        properties = {
+          region  = data.aws_region.current.name
+          title   = "RDS Write Latency"
+          metrics = [for id in var.rds_instance_ids : ["AWS/RDS", "WriteLatency", "DBInstanceIdentifier", id]]
+          period  = 300
+          stat    = "Average"
+          view    = "timeSeries"
+        }
+      },
+
+      # Lambda
+      {
+        type   = "metric"
+        x      = 0
+        y      = 54
+        width  = 6
+        height = 6
+
+        properties = {
+          region  = data.aws_region.current.name
+          title   = "Lambda Invocations"
+          metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Invocations", "FunctionName", fn]]
+          period  = 60
+          stat    = "Sum"
+          view    = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 6
+        y      = 54
+        width  = 6
+        height = 6
+
+        properties = {
+          region  = data.aws_region.current.name
           title   = "Lambda Errors"
           metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Errors", "FunctionName", fn]]
           period  = 60
@@ -387,10 +818,15 @@ resource "aws_cloudwatch_dashboard" "main" {
           view    = "timeSeries"
         }
       },
-      # Lambda 실행 시간
       {
-        type = "metric"
+        type   = "metric"
+        x      = 12
+        y      = 54
+        width  = 6
+        height = 6
+
         properties = {
+          region  = data.aws_region.current.name
           title   = "Lambda Duration"
           metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Duration", "FunctionName", fn]]
           period  = 60
@@ -398,22 +834,35 @@ resource "aws_cloudwatch_dashboard" "main" {
           view    = "timeSeries"
         }
       },
-      # RDS CPU
       {
-        type = "metric"
+        type   = "metric"
+        x      = 18
+        y      = 54
+        width  = 6
+        height = 6
+
         properties = {
-          title   = "RDS CPU Utilization"
-          metrics = [for id in var.rds_instance_ids : ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", id]]
-          period  = 300
-          stat    = "Average"
+          region  = data.aws_region.current.name
+          title   = "Lambda Throttles"
+          metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Throttles", "FunctionName", fn]]
+          period  = 60
+          stat    = "Sum"
           view    = "timeSeries"
         }
       },
-      # CloudFront 에러율
+
+      # CloudFront
       {
-        type = "metric"
+        type   = "metric"
+        x      = 0
+        y      = 60
+        width  = 24
+        height = 6
+
         properties = {
-          title = "CloudFront Error Rate"
+          # CloudFront 지표는 글로벌 → CloudWatch us-east-1 에만 보고
+          region = "us-east-1"
+          title  = "CloudFront Error Rate"
           metrics = var.cloudfront_distribution_id != "" ? [
             ["AWS/CloudFront", "5xxErrorRate", "DistributionId", var.cloudfront_distribution_id, "Region", "Global"],
             ["AWS/CloudFront", "4xxErrorRate", "DistributionId", var.cloudfront_distribution_id, "Region", "Global"]

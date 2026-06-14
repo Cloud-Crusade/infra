@@ -33,7 +33,7 @@ variable "instance_class" {
 variable "engine_version" {
   description = "PostgreSQL 버전"
   type        = string
-  default     = "13.18"
+  default     = "13.23"
 }
 
 variable "allocated_storage" {

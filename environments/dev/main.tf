@@ -14,6 +14,14 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 3.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
   }
 }
 
@@ -40,6 +48,28 @@ provider "aws" {
       Environment = var.environment
       ManagedBy   = "Terraform"
     }
+  }
+}
+
+provider "helm" {
+  kubernetes = {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_ca_data)
+    exec = {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+    }
+  }
+}
+
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_ca_data)
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
   }
 }
 
@@ -73,9 +103,81 @@ module "security_groups" {
   project_name      = var.project_name
   environment       = var.environment
   vpc_id            = module.vpc.vpc_id
-  vpc_cidr          = var.vpc_cidr
+  vpc_cidr          = module.vpc.vpc_cidr
   allowed_ssh_cidrs = var.allowed_ssh_cidrs
 }
+
+module "eks" {
+  source = "../../modules/eks"
+
+  project_name = var.project_name
+  environment  = var.environment
+  subnet_ids   = module.vpc.private_subnet_ids
+
+  additional_security_group_ids = [module.security_groups.eks_sg_id]
+
+  cluster_version = var.eks_cluster_version
+
+  # TODO: 환경별 엔드포인트 접근 정책 설정
+  cluster_endpoint_public_access       = var.eks_endpoint_public_access
+  cluster_endpoint_private_access      = var.eks_endpoint_private_access
+  cluster_endpoint_public_access_cidrs = var.eks_endpoint_public_access_cidrs
+
+  cluster_enabled_log_types = var.eks_enabled_log_types
+
+  # system 노드 그룹
+  system_ng_instance_types = var.eks_system_ng_instance_types
+  system_ng_capacity_type  = var.eks_system_ng_capacity_type
+  system_ng_desired_size   = var.eks_system_ng_desired_size
+  system_ng_min_size       = var.eks_system_ng_min_size
+  system_ng_max_size       = var.eks_system_ng_max_size
+
+  # app 노드 그룹
+  app_ng_instance_types = var.eks_app_ng_instance_types
+  app_ng_capacity_type  = var.eks_app_ng_capacity_type
+  app_ng_desired_size   = var.eks_app_ng_desired_size
+  app_ng_min_size       = var.eks_app_ng_min_size
+  app_ng_max_size       = var.eks_app_ng_max_size
+
+  # IAM ARN
+  cluster_role_arn = module.iam.cluster_role_arn
+  node_role_arn    = module.iam.ng_role_arn
+  vpc_cni_role_arn = module.iam.vpc_cni_role_arn
+  ebs_csi_role_arn = module.iam.ebs_csi_role_arn
+
+  access_entries = var.eks_access_entries
+}
+
+/** RDS / ElastiCache 추가 후 
+# SVC
+resource "kubernetes_service_v1" "rds" {
+  metadata {
+    name = "rds-svc"
+    namespace = "default"
+  }
+
+  spec {
+    type = "ExternalName"
+    external_name = var.rds_endpoint
+  }
+
+  depends_on = [module.rds]
+}
+
+resource "kubernetes_service_v1" "elasticache" {
+  metadata {
+    name = "elasticache-svc"
+    namespace = "default"
+  }
+
+  spec {
+    type = "ExternalName"
+    external_name = var.elasticache_endpoint
+  }
+
+  depends_on = [module.elasticache]
+}
+*/
 module "secrets_manager" {
   source                        = "../../modules/secrets_manager"
   project_name                  = var.project_name
@@ -170,6 +272,8 @@ module "lambda" {
       REDIS_PORT = "6379"
       # 예약 서명키(RSA 개인키)는 값이 아닌 이름만 — 런타임에 Secrets 확장 캐시로 조회(VPC 엔드포인트 경유)
       RESERVATION_SECRET_ID = module.secrets_manager.reservation_private_key_secret_arn
+      # access token(HS256) 검증용 — 큐가 sub→user_id 추출. authorizer 와 동일 시크릿
+      AUTHORIZATION_SECRET_ID = module.secrets_manager.authorization_secret_arn
     }
     # 예약 토큰 서명 검증 authorizer — CloudFront 로 reservation 공개키 fetch(RS256 검증)
     # S3 직접 접근 대신 CloudFront URL → S3 IAM 불필요 + 접근 비용 절감
@@ -238,6 +342,15 @@ module "elasticache" {
   waiting_room_port                   = 6379
   waiting_room_num_clusters           = 1
   waiting_room_sg_id                  = module.security_groups.cache_sg_id
+
+  blacklist_replication_group_id   = "${var.project_name}-${var.environment}-blacklist"
+  blacklist_engine                 = "redis"
+  blacklist_engine_version         = "7.1"
+  blacklist_parameter_group_family = "redis7"
+  blacklist_node_type              = "cache.t3.micro"
+  blacklist_port                   = 6379
+  blacklist_num_clusters           = 1
+  blacklist_sg_id                  = module.security_groups.cache_sg_id
 }
 
 # Route53 레코드 — www → CloudFront(클라이언트), api → ALB(서버)
@@ -304,4 +417,21 @@ module "nlb" {
   project_name = var.project_name
   environment = var.environment
   subnet_ids = module.vpc.private_subnet_ids
+}
+
+module "prometheus" {
+  source = "../../modules/prometheus"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  # EKS (틀만 — 모듈 연결 후 활성화)
+  eks_cluster_name = ""
+}
+
+module "eventbridge" {
+  source = "../../modules/eventbridge"
+
+  project_name = var.project_name
+  environment  = var.environment
 }

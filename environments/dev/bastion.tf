@@ -1,3 +1,13 @@
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+}
+
 resource "tls_private_key" "bastion" {
   algorithm = "RSA"
   rsa_bits  = 4096
@@ -15,7 +25,7 @@ resource "local_file" "bastion_private_key" {
 }
 
 resource "aws_instance" "bastion" {
-  ami                         = var.bastion_ami
+  ami                         = data.aws_ami.amazon_linux.id
   instance_type               = var.bastion_instance_type
   subnet_id                   = module.vpc.public_subnet_ids[0]
   vpc_security_group_ids      = [module.security_groups.bastion_sg_id]
@@ -27,16 +37,29 @@ resource "aws_instance" "bastion" {
   }
 
   user_data = <<-EOF
-              #!/bin/bash
-              dnf update -y
 
-              dnf install -y docker
+                # docker compsoe 설치
+                  mkdir -p /usr/libexec/docker/cli-plugins/
+                  curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
+                  chmod +x /usr/libexec/docker/cli-plugins/docker-compose
 
-              systemctl start docker
-              systemctl enable docker
+                  # k6 설치
+                  dnf install -y https://dl.k6.io/rpm/repo.rpm
+                  dnf install -y k6 
 
-              usermod -aG docker ec2-user
-              EOF
+                  # stress 설치
+                  dnf install -y stres
+            
+                  # grafana compose 파일 생성
+                  mkdir -p /home/ec2-user/grafana
+                  cat > /home/ec2-user/grafana/docker-compose.yml <<'COMPOSE'
+                  ${file("${path.module}/compose/grafana/docker-compose.yml")}
+                  COMPOSE
+
+                  # grafana 실행
+                  cd /home/ec2-user/grafana
+                  docker compose up -d
+                  EOF
 }
 
 # bastion 개인키를 backend(state) 와 동일한 S3 버킷에 업로드 (팀 SSH 접근용)

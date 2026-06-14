@@ -22,38 +22,67 @@ resource "aws_api_gateway_authorizer" "reservation" {
   identity_source = "method.request.header.Reservation"
 }
 
-# Reservation 헤더 없음(identity source 누락 → 기본 401)을 403 으로 매핑
+# authorizer 거부 응답. 헤더 누락 → UNAUTHORIZED(403 매핑), 서명무효·만료·불일치 → Deny → ACCESS_DENIED(403).
+# 둘 다 CORS 헤더를 실어 브라우저가 4xx 를 읽고 클라이언트가 토큰 정리·재대기열 가능하게 한다.
 resource "aws_api_gateway_gateway_response" "unauthorized" {
-  rest_api_id   = aws_api_gateway_rest_api.this.id
-  response_type = "UNAUTHORIZED"
-  status_code   = "403"
+  rest_api_id         = aws_api_gateway_rest_api.this.id
+  response_type       = "UNAUTHORIZED"
+  status_code         = "403"
+  response_parameters = local.gateway_cors_headers
 }
 
-# ===== /reservations (Reservation 헤더 필수) =====
+resource "aws_api_gateway_gateway_response" "access_denied" {
+  rest_api_id         = aws_api_gateway_rest_api.this.id
+  response_type       = "ACCESS_DENIED"
+  status_code         = "403"
+  response_parameters = local.gateway_cors_headers
+}
+
+# ===== /reservations =====
+# 대기열 입장 토큰(Reservation)은 스파이크 경로인 예매 진입(POST 생성)에만 게이트한다.
+# 확인(GET)·취소(DELETE)는 access 토큰만 필요(백엔드 getCurrentUserId 가 인증) → authorization=NONE 으로 프록시.
 resource "aws_api_gateway_resource" "reservations" {
   rest_api_id = aws_api_gateway_rest_api.this.id
   parent_id   = aws_api_gateway_rest_api.this.root_resource_id
   path_part   = "reservations"
 }
 
-resource "aws_api_gateway_method" "reservations" {
+# POST 생성 — 입장 토큰 게이트
+resource "aws_api_gateway_method" "reservations_post" {
   rest_api_id   = aws_api_gateway_rest_api.this.id
   resource_id   = aws_api_gateway_resource.reservations.id
-  http_method   = "ANY"
+  http_method   = "POST"
   authorization = "CUSTOM"
   authorizer_id = aws_api_gateway_authorizer.reservation.id
 }
 
-resource "aws_api_gateway_integration" "reservations" {
+resource "aws_api_gateway_integration" "reservations_post" {
   rest_api_id             = aws_api_gateway_rest_api.this.id
   resource_id             = aws_api_gateway_resource.reservations.id
-  http_method             = aws_api_gateway_method.reservations.http_method
+  http_method             = aws_api_gateway_method.reservations_post.http_method
   type                    = "HTTP_PROXY"
-  integration_http_method = "ANY"
+  integration_http_method = "POST"
   uri                     = "${var.reservation_backend_url}/reservations"
 }
 
-# ===== /reservations/{reservation_id} (Reservation 헤더 필수) =====
+# GET 목록 — 확인은 access 토큰만(입장 토큰 불필요)
+resource "aws_api_gateway_method" "reservations_get" {
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.reservations.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "reservations_get" {
+  rest_api_id             = aws_api_gateway_rest_api.this.id
+  resource_id             = aws_api_gateway_resource.reservations.id
+  http_method             = aws_api_gateway_method.reservations_get.http_method
+  type                    = "HTTP_PROXY"
+  integration_http_method = "GET"
+  uri                     = "${var.reservation_backend_url}/reservations"
+}
+
+# ===== /reservations/{reservation_id} — 확인(GET)·취소(DELETE): access 토큰만 =====
 resource "aws_api_gateway_resource" "reservation_item" {
   rest_api_id = aws_api_gateway_rest_api.this.id
   parent_id   = aws_api_gateway_resource.reservations.id
@@ -61,26 +90,91 @@ resource "aws_api_gateway_resource" "reservation_item" {
 }
 
 resource "aws_api_gateway_method" "reservation_item" {
+  for_each      = toset(["GET", "DELETE"])
   rest_api_id   = aws_api_gateway_rest_api.this.id
   resource_id   = aws_api_gateway_resource.reservation_item.id
-  http_method   = "ANY"
-  authorization = "CUSTOM"
-  authorizer_id = aws_api_gateway_authorizer.reservation.id
+  http_method   = each.value
+  authorization = "NONE"
   request_parameters = {
     "method.request.path.reservation_id" = true
   }
 }
 
 resource "aws_api_gateway_integration" "reservation_item" {
+  for_each                = aws_api_gateway_method.reservation_item
   rest_api_id             = aws_api_gateway_rest_api.this.id
   resource_id             = aws_api_gateway_resource.reservation_item.id
-  http_method             = aws_api_gateway_method.reservation_item.http_method
+  http_method             = each.value.http_method
   type                    = "HTTP_PROXY"
-  integration_http_method = "ANY"
+  integration_http_method = each.value.http_method
   uri                     = "${var.reservation_backend_url}/reservations/{reservation_id}"
   request_parameters = {
     "integration.request.path.reservation_id" = "method.request.path.reservation_id"
   }
+}
+
+# ===== /reservations* CORS 프리플라이트 =====
+# 명시 리소스라 OPTIONS 를 직접 정의해야 함. authorization=NONE + MOCK 으로 CORS 헤더만 반환
+# (POST 의 CUSTOM authorizer 는 프리플라이트(헤더 없음)를 거부하므로 OPTIONS 를 분리).
+locals {
+  cors_resources = {
+    reservations     = aws_api_gateway_resource.reservations.id
+    reservation_item = aws_api_gateway_resource.reservation_item.id
+  }
+  # 헤더 값을 한 곳에서 정의 → integration_response 와 배포 트리거가 같은 출처 참조(값 변경 시 재배포)
+  cors_response_headers = {
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Reservation,Content-Type,X-Captcha-Token'"
+    "method.response.header.Access-Control-Max-Age"       = "'600'"
+  }
+  # authorizer 거부(4xx) 응답용 CORS 헤더 — 위 값을 gatewayresponse 접두사로 재사용(Max-Age 는 에러응답 불필요라 제외)
+  gateway_cors_headers = {
+    for key, value in local.cors_response_headers :
+    replace(key, "method.response.header.", "gatewayresponse.header.") => value
+    if !endswith(key, "Max-Age")
+  }
+}
+
+resource "aws_api_gateway_method" "cors" {
+  for_each      = local.cors_resources
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = each.value
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "cors" {
+  for_each          = local.cors_resources
+  rest_api_id       = aws_api_gateway_rest_api.this.id
+  resource_id       = each.value
+  http_method       = aws_api_gateway_method.cors[each.key].http_method
+  type              = "MOCK"
+  request_templates = { "application/json" = "{\"statusCode\": 200}" }
+}
+
+resource "aws_api_gateway_method_response" "cors" {
+  for_each    = local.cors_resources
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  resource_id = each.value
+  http_method = aws_api_gateway_method.cors[each.key].http_method
+  status_code = "200"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Max-Age"       = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "cors" {
+  for_each            = local.cors_resources
+  rest_api_id         = aws_api_gateway_rest_api.this.id
+  resource_id         = each.value
+  http_method         = aws_api_gateway_method.cors[each.key].http_method
+  status_code         = aws_api_gateway_method_response.cors[each.key].status_code
+  response_parameters = local.cors_response_headers
+  depends_on          = [aws_api_gateway_integration.cors]
 }
 
 # ===== /queue/{event_id} → queue Lambda =====
@@ -179,10 +273,10 @@ resource "aws_api_gateway_deployment" "this" {
 
   triggers = {
     redeployment = sha1(jsonencode(concat([
-      aws_api_gateway_method.reservations.id,
-      aws_api_gateway_integration.reservations.id,
-      aws_api_gateway_method.reservation_item.id,
-      aws_api_gateway_integration.reservation_item.id,
+      aws_api_gateway_method.reservations_post.id,
+      aws_api_gateway_integration.reservations_post.id,
+      aws_api_gateway_method.reservations_get.id,
+      aws_api_gateway_integration.reservations_get.id,
       aws_api_gateway_method.queue.id,
       aws_api_gateway_integration.queue.id,
       aws_api_gateway_method.proxy.id,
@@ -190,9 +284,19 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_authorizer.reservation.id,
       aws_api_gateway_gateway_response.unauthorized.id,
       aws_api_gateway_gateway_response.unauthorized.status_code,
-      ], var.enable_captcha_route ? [
-      aws_api_gateway_method.captcha_challenge[0].id,
-      aws_api_gateway_integration.captcha_challenge[0].id,
+      aws_api_gateway_gateway_response.access_denied.id,
+      aws_api_gateway_gateway_response.access_denied.status_code,
+      jsonencode(local.cors_response_headers),
+      jsonencode(local.gateway_cors_headers),
+      ],
+      values(aws_api_gateway_method.reservation_item)[*].id,
+      values(aws_api_gateway_integration.reservation_item)[*].id,
+      values(aws_api_gateway_method.cors)[*].id,
+      values(aws_api_gateway_integration.cors)[*].id,
+      values(aws_api_gateway_integration_response.cors)[*].status_code,
+      var.enable_captcha_route ? [
+        aws_api_gateway_method.captcha_challenge[0].id,
+        aws_api_gateway_integration.captcha_challenge[0].id,
     ] : [])))
   }
 
@@ -201,10 +305,16 @@ resource "aws_api_gateway_deployment" "this" {
   }
 
   depends_on = [
-    aws_api_gateway_method.reservations,
-    aws_api_gateway_integration.reservations,
+    aws_api_gateway_method.reservations_post,
+    aws_api_gateway_integration.reservations_post,
+    aws_api_gateway_method.reservations_get,
+    aws_api_gateway_integration.reservations_get,
     aws_api_gateway_method.reservation_item,
     aws_api_gateway_integration.reservation_item,
+    aws_api_gateway_method.cors,
+    aws_api_gateway_integration.cors,
+    aws_api_gateway_method_response.cors,
+    aws_api_gateway_integration_response.cors,
     aws_api_gateway_method.queue,
     aws_api_gateway_integration.queue,
     aws_api_gateway_method.captcha_challenge,
@@ -212,7 +322,8 @@ resource "aws_api_gateway_deployment" "this" {
     aws_api_gateway_method.proxy,
     aws_api_gateway_integration.proxy,
     aws_api_gateway_authorizer.reservation,
-    aws_api_gateway_gateway_response.unauthorized
+    aws_api_gateway_gateway_response.unauthorized,
+    aws_api_gateway_gateway_response.access_denied
   ]
 }
 
