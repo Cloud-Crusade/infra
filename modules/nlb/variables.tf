@@ -16,7 +16,7 @@ variable "subnet_ids" {
 variable "enable_detection_protection" {
   description = "NLB 삭제 방지 활성화 여부"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "enable_zonal_shift" {
