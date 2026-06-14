@@ -152,7 +152,8 @@ module "eks" {
   domain_name         = var.domain_name
   captcha_enabled     = var.captcha_enabled
   ticketing_image_tag = var.ticketing_image_tag
-  ecr_repository_urls = { for k, r in aws_ecr_repository.ticketing : k => r.repository_url }
+  # 리포지토리(ticketing-<svc>)는 terraform 밖에서 선행 생성 → 레지스트리 호스트만 전달
+  ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 
   # RDS/ElastiCache 고정 DNS(ExternalName) 타깃 — 엔드포인트 컷오버 시 타깃만 갱신
   rds_core_writer_endpoint        = module.rds.primary_endpoint

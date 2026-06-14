@@ -163,7 +163,7 @@ module "ticketing_service" {
 
   name      = each.key
   namespace = local.ticketing_namespace
-  image     = "${var.ecr_repository_urls[each.key]}:${var.ticketing_image_tag}"
+  image     = local.ticketing_images[each.key]
 
   replicas     = 1
   min_replicas = 1

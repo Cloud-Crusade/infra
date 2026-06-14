@@ -173,9 +173,9 @@ variable "ticketing_image_tag" {
   default     = "latest"
 }
 
-variable "ecr_repository_urls" {
-  description = "서비스명 → ECR 리포지토리 URL 맵 (auth|event|reservation|payment)"
-  type        = map(string)
+variable "ecr_registry" {
+  description = "ECR 레지스트리 호스트 (<account_id>.dkr.ecr.<region>.amazonaws.com). 리포지토리(ticketing-<svc>)는 terraform 밖에서 선행 생성"
+  type        = string
 }
 
 # RDS/ElastiCache 고정 DNS(ExternalName) 타깃 — host:port 형식 그대로 받아 모듈 내부에서 포트 분리

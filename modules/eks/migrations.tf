@@ -27,7 +27,7 @@ resource "kubernetes_job_v1" "migrate" {
 
         container {
           name    = "migrate"
-          image   = "${var.ecr_repository_urls[each.key]}:${var.ticketing_image_tag}"
+          image   = local.ticketing_images[each.key]
           command = ["uv", "run", "--package", "cc-${each.key}", "alembic", "-c", "services/${each.key}/alembic/alembic.ini", "upgrade", "head"]
 
           env_from {
