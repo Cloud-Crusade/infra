@@ -61,9 +61,9 @@ function generateTestToken(userId, secret) {
 }
 
 export function setup() {
-    // 시크릿 키 누락 시 테스트가 실행되지 않도록 강제 종료 처리
+    // 실행 시 환경 변수가 누락되었는지 검증합니다.
     if (!CONFIG.JWT_SECRET_KEY) {
-        throw new Error('[실행 차단] JWT_SECRET_KEY 환경 변수가 설정되지 않았습니다. 테스트를 시작할 수 없습니다.');
+        throw new Error('[실행 실패] JWT_SECRET_KEY 환경 변수가 설정되지 않았습니다. 테스트를 시작할 수 없습니다.');
     }
     return {};
 }
