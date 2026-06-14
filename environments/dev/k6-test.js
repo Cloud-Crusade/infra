@@ -26,6 +26,7 @@ export const options = {
 //  [설정 사항] 환경 변수(Environment Variable) 적용
 // ==========================================
 const CONFIG = {
+
     // Git에 공유되어도 안전한 엔드포인트 정보
     BASE_URL: 'https://yeuc9w7wyj.execute-api.ap-northeast-2.amazonaws.com/dev',
     EVENT_ID: 'concert-2026',
