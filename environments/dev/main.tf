@@ -243,6 +243,8 @@ module "lambda" {
       REDIS_PORT = "6379"
       # 예약 서명키(RSA 개인키)는 값이 아닌 이름만 — 런타임에 Secrets 확장 캐시로 조회(VPC 엔드포인트 경유)
       RESERVATION_SECRET_ID = module.secrets_manager.reservation_private_key_secret_arn
+      # access token(HS256) 검증용 — 큐가 sub→user_id 추출. authorizer 와 동일 시크릿
+      AUTHORIZATION_SECRET_ID = module.secrets_manager.authorization_secret_arn
     }
     # 예약 토큰 서명 검증 authorizer — CloudFront 로 reservation 공개키 fetch(RS256 검증)
     # S3 직접 접근 대신 CloudFront URL → S3 IAM 불필요 + 접근 비용 절감
@@ -380,6 +382,14 @@ module "cloudwatch" {
   api_gateway_name = ""
 }
 
+module "nlb" {
+  source = "../../modules/nlb"
+
+  project_name = var.project_name
+  environment  = var.environment
+  subnet_ids   = module.vpc.private_subnet_ids
+}
+
 module "prometheus" {
   source = "../../modules/prometheus"
 
@@ -388,4 +398,11 @@ module "prometheus" {
 
   # EKS (틀만 — 모듈 연결 후 활성화)
   eks_cluster_name = ""
+}
+
+module "eventbridge" {
+  source = "../../modules/eventbridge"
+
+  project_name = var.project_name
+  environment  = var.environment
 }

@@ -3,14 +3,33 @@
 # (임시 테스트 픽스처: 테스트 종료 후 이 파일만 제거하면 됨)
 # =========================================================
 
-variable "test_service_image" {
-  description = "ECR 서비스 이미지 URI (예: <acct>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>). 실값은 GitHub var/tfvars 로 주입"
+variable "test_image_registry" {
+  description = "ECR 레지스트리 override (예: <acct>.dkr.ecr.<region>.amazonaws.com). 미설정 시 현재 계정·리전에서 파생. 이미지는 <registry>/<namespace>/<svc>:<tag>"
   type        = string
   default     = ""
 }
 
+variable "ecr_namespace" {
+  description = "ECR 리포지토리 네임스페이스 prefix — cc/app CD 의 vars.ECR_NAMESPACE 와 동일해야 함"
+  type        = string
+  default     = "ticketing"
+}
+
+variable "test_image_tag" {
+  description = "<namespace>/<svc> 이미지 태그"
+  type        = string
+  default     = "latest"
+}
+
+# 레지스트리는 ECR 리소스 의존 없이 현재 계정·리전에서 파생
+data "aws_caller_identity" "current" {}
+
+locals {
+  test_ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+}
+
 variable "test_service_port" {
-  description = "컨테이너 서비스 포트"
+  description = "nginx 게이트웨이 포트 (API Gateway 백엔드). 서비스 직접 포트는 +1..+4"
   type        = number
   default     = 8000
 }
@@ -93,10 +112,11 @@ resource "aws_security_group" "test_ec2" {
   description = "Test EC2 running ECR service image"
   vpc_id      = module.vpc.vpc_id
 
+  # nginx 게이트웨이(8000) + 서비스 직접 디버깅 포트(8001-8004)
   ingress {
-    description = "service port"
+    description = "nginx gateway + per-service debug ports"
     from_port   = var.test_service_port
-    to_port     = var.test_service_port
+    to_port     = var.test_service_port + 4
     protocol    = "tcp"
     cidr_blocks = var.test_service_ingress_cidrs
   }
@@ -139,11 +159,14 @@ resource "aws_instance" "test_service" {
   # docker 설치 → ECR 로그인 → 이미지 pull → run (.env 마운트)
   # 별도 템플릿 사용: HCL heredoc 들여쓰기로 shebang 이 깨져 cloud-init 미실행되던 문제 방지
   user_data = templatefile("${path.module}/templates/test_ec2_user_data.sh.tftpl", {
-    region                 = var.aws_region
-    image                  = var.test_service_image
+    region = var.aws_region
+    # 기본은 현재 계정·리전 ECR 레지스트리 — 필요 시 var 로 override
+    registry               = var.test_image_registry != "" ? var.test_image_registry : local.test_ecr_registry
+    namespace              = var.ecr_namespace
+    tag                    = var.test_image_tag
     port                   = var.test_service_port
     core_writer_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_endpoint}/${var.db_name}"
-    core_reader_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_endpoint}/${var.db_name}"
+    core_reader_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.primary_replica_endpoint}/${var.db_name}"
     reservation_writer_url = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_endpoint}/${var.db_name}"
     reservation_reader_url = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.rds.reservation_replica_endpoint}/${var.db_name}"
     redis_url              = "redis://${module.elasticache.main_cache_endpoint}:6379/0"
