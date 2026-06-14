@@ -146,9 +146,34 @@ module "eks" {
   ebs_csi_role_arn = module.iam.ebs_csi_role_arn
 
   access_entries = var.eks_access_entries
-}
 
-# RDS/ElastiCache 고정 DNS(ExternalName) 와 MSA 워크로드는 eks_*.tf 로 분리
+  # ----- MSA 워크로드 배선 (Deployment·Service·HPA·SA·DB롤·마이그레이션) -----
+  aws_region          = var.aws_region
+  domain_name         = var.domain_name
+  captcha_enabled     = var.captcha_enabled
+  ticketing_image_tag = var.ticketing_image_tag
+  ecr_repository_urls = { for k, r in aws_ecr_repository.ticketing : k => r.repository_url }
+
+  # RDS/ElastiCache 고정 DNS(ExternalName) 타깃 — 엔드포인트 컷오버 시 타깃만 갱신
+  rds_core_writer_endpoint        = module.rds.primary_endpoint
+  rds_core_reader_endpoint        = module.rds.primary_replica_endpoint
+  rds_reservation_writer_endpoint = module.rds.reservation_endpoint
+  rds_reservation_reader_endpoint = module.rds.reservation_replica_endpoint
+  redis_main_endpoint             = module.elasticache.main_cache_endpoint
+
+  # reservation IRSA(SendMessage) + ConfigMap 큐 URL
+  sqs_queue_url = module.sqs.queue_url
+  sqs_queue_arn = module.sqs.queue_arn
+
+  # 검증측(authorizer)과 공유하는 시크릿 — 루트가 random_password 소유
+  jwt_secret          = random_password.authorization.result
+  captcha_hmac_secret = random_password.captcha_hmac.result
+
+  # 서비스별 DB 롤 부트스트랩(master 크리덴셜)
+  db_name     = var.db_name
+  db_username = var.db_username
+  db_password = var.db_password
+}
 module "secrets_manager" {
   source                        = "../../modules/secrets_manager"
   project_name                  = var.project_name
