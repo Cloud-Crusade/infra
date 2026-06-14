@@ -268,6 +268,12 @@ resource "aws_api_gateway_integration" "proxy" {
 }
 
 # ===== 배포 + 스테이지 =====
+
+resource "aws_cloudwatch_log_group" "access_log" {
+  name              = "/aws/apigateway/${local.name}-access-log"
+  retention_in_days = 14
+}
+
 resource "aws_api_gateway_deployment" "this" {
   rest_api_id = aws_api_gateway_rest_api.this.id
 
@@ -331,6 +337,22 @@ resource "aws_api_gateway_stage" "this" {
   rest_api_id   = aws_api_gateway_rest_api.this.id
   deployment_id = aws_api_gateway_deployment.this.id
   stage_name    = var.environment
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.access_log.arn
+
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      requestTime    = "$context.requestTime"
+      httpMethod     = "$context.httpMethod"
+      resourcePath   = "$context.resourcePath"
+      path           = "$context.path"
+      status         = "$context.status"
+      responseLength = "$context.responseLength"
+      userAgent      = "$context.identity.userAgent"
+    })
+  }
 }
 
 # 게이트웨이 → queue Lambda invoke 권한 (Lambda 자체는 외부 생성)
