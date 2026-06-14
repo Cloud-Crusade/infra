@@ -1,93 +1,154 @@
+locals {
+  cluster_name = "${var.project_name}-${var.environment}-eks"
+}
+
 resource "aws_eks_cluster" "this" {
-  name     = "${var.project_name}-${var.environment}-eks"
-  role_arn = aws_iam_role.cluster.arn
-  version  = var.cluster_version
+  name     = local.cluster_name
+  role_arn = var.cluster_role_arn
 
   vpc_config {
     subnet_ids              = var.subnet_ids
-    endpoint_private_access = true
-    endpoint_public_access  = var.endpoint_public_access
+    security_group_ids      = var.additional_security_group_ids
+    endpoint_private_access = var.cluster_endpoint_private_access
+    endpoint_public_access  = var.cluster_endpoint_public_access
+    public_access_cidrs     = var.cluster_endpoint_public_access_cidrs
   }
+  version = var.cluster_version
 
-  depends_on = [
-    aws_iam_role_policy_attachment.cluster_policy,
-  ]
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-eks"
-  }
+  enabled_cluster_log_types = var.cluster_enabled_log_types
 }
 
-resource "aws_iam_role" "cluster" {
-  name = "${var.project_name}-${var.environment}-eks-cluster-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "eks.amazonaws.com"
-      }
-    }]
-  })
+data "tls_certificate" "eks_oidc" {
+  url = aws_eks_cluster.this.identity[0].oidc[0].issuer
 }
 
-resource "aws_iam_role_policy_attachment" "cluster_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-  role       = aws_iam_role.cluster.name
+resource "aws_iam_openid_connect_provider" "eks" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.eks_oidc.certificates[0].sha1_fingerprint]
+  url             = aws_eks_cluster.this.identity[0].oidc[0].issuer
 }
 
-resource "aws_eks_node_group" "this" {
+# system 노드 그룹
+resource "aws_eks_node_group" "system" {
   cluster_name    = aws_eks_cluster.this.name
-  node_group_name = "${var.project_name}-${var.environment}-node-group"
-  node_role_arn   = aws_iam_role.node.arn
+  node_group_name = "${local.cluster_name}-system-ng"
+  node_role_arn   = var.node_role_arn
   subnet_ids      = var.subnet_ids
-  instance_types  = var.node_instance_types
+
+  capacity_type  = var.system_ng_capacity_type
+  instance_types = var.system_ng_instance_types
+  disk_size      = var.system_ng_disk_size
+  ami_type       = "AL2023_x86_64_STANDARD"
 
   scaling_config {
-    desired_size = var.node_desired_size
-    min_size     = var.node_min_size
-    max_size     = var.node_max_size
+    desired_size = var.system_ng_desired_size
+    max_size     = var.system_ng_max_size
+    min_size     = var.system_ng_min_size
   }
 
-  depends_on = [
-    aws_iam_role_policy_attachment.node_policy,
-    aws_iam_role_policy_attachment.cni_policy,
-    aws_iam_role_policy_attachment.ecr_policy,
-  ]
+  update_config {
+    max_unavailable = 1
+  }
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-node-group"
+  taint {
+    key    = "dedicated"
+    value  = "system"
+    effect = "NO_SCHEDULE"
+  }
+
+  labels = {
+    role = "system"
   }
 }
 
-resource "aws_iam_role" "node" {
-  name = "${var.project_name}-${var.environment}-eks-node-role"
+# app 노드 그룹 — 애플리케이션 워크로드 전용
+resource "aws_eks_node_group" "app" {
+  cluster_name    = aws_eks_cluster.this.name
+  node_group_name = "${local.cluster_name}-app-ng"
+  node_role_arn   = var.node_role_arn
+  subnet_ids      = var.subnet_ids
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "ec2.amazonaws.com"
-      }
-    }]
-  })
+  capacity_type  = var.app_ng_capacity_type
+  disk_size      = var.app_ng_disk_size
+  instance_types = var.app_ng_instance_types
+  ami_type       = "AL2023_x86_64_STANDARD"
+
+  scaling_config {
+    desired_size = var.app_ng_desired_size
+    max_size     = var.app_ng_max_size
+    min_size     = var.app_ng_min_size
+  }
+
+  update_config {
+    max_unavailable = 1
+  }
+
+  taint {
+    key    = "dedicated"
+    value  = "app"
+    effect = "NO_SCHEDULE"
+  }
+
+  labels = {
+    role = "app"
+  }
 }
 
-resource "aws_iam_role_policy_attachment" "node_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-  role       = aws_iam_role.node.name
+# EKS 애드온
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name             = aws_eks_cluster.this.name
+  addon_name               = "vpc-cni"
+  addon_version            = "v1.18.3-eksbuild.1"
+  service_account_role_arn = var.vpc_cni_role_arn
+
+  depends_on = [aws_eks_node_group.system, aws_eks_node_group.app]
 }
 
-resource "aws_iam_role_policy_attachment" "cni_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = aws_iam_role.node.name
+resource "aws_eks_addon" "kube_proxy" {
+  cluster_name  = aws_eks_cluster.this.name
+  addon_name    = "kube-proxy"
+  addon_version = "v1.32.0-eksbuild.2"
+
+  depends_on = [aws_eks_node_group.system, aws_eks_node_group.app]
 }
 
-resource "aws_iam_role_policy_attachment" "ecr_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-  role       = aws_iam_role.node.name
+resource "aws_eks_addon" "coredns" {
+  cluster_name  = aws_eks_cluster.this.name
+  addon_name    = "coredns"
+  addon_version = "v1.11.4-eksbuild.2"
+
+  depends_on = [aws_eks_node_group.system, aws_eks_node_group.app]
+}
+
+resource "aws_eks_addon" "ebs_csi_driver" {
+  cluster_name             = aws_eks_cluster.this.name
+  addon_name               = "aws-ebs-csi-driver"
+  addon_version            = "v1.38.1-eksbuild.1"
+  service_account_role_arn = var.ebs_csi_role_arn
+
+  depends_on = [aws_eks_node_group.system, aws_eks_node_group.app]
+}
+
+# 7. 클러스터 접근 제어
+
+resource "aws_eks_access_entry" "this" {
+  for_each = { for e in var.access_entries : e.principal_arn => e }
+
+  cluster_name      = aws_eks_cluster.this.name
+  principal_arn     = each.value.principal_arn
+  kubernetes_groups = each.value.kubernetes_groups
+  type              = each.value.type
+}
+
+resource "aws_eks_access_policy_association" "this" {
+  for_each = { for e in var.access_entries : e.principal_arn => e if e.policy_arn != null }
+
+  cluster_name  = aws_eks_cluster.this.name
+  principal_arn = each.value.principal_arn
+
+  policy_arn = each.value.policy_arn
+
+  access_scope {
+    type = "cluster"
+  }
 }

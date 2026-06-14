@@ -17,13 +17,13 @@ output "lambda_role_arn" {
 }
 
 # vpc_cni 롤 ARN (IRSA)
-# output "vpc_cni_role_arn" {
-#   description = "vpc-cni 애드온 IRSA Role ARN"
-#   value       = aws_iam_role.vpc_cni.arn
-# }
+output "vpc_cni_role_arn" {
+  description = "vpc-cni 애드온 IRSA Role ARN"
+  value       = aws_iam_role.vpc_cni.arn
+}
 
 # ebs_csi 롤 ARN (IRSA)
-# output "ebs_csi_role_arn" {
-#   description = "ebs-csi-driver 애드온 IRSA Role ARN"
-#   value       = aws_iam_role.ebs_csi.arn
-# }
+output "ebs_csi_role_arn" {
+  description = "ebs-csi-driver 애드온 IRSA Role ARN"
+  value       = aws_iam_role.ebs_csi.arn
+}

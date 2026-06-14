@@ -4,16 +4,26 @@ output "cluster_name" {
 }
 
 output "cluster_endpoint" {
-  description = "EKS 클러스터 API 서버 엔드포인트"
+  description = "EKS API 서버 엔드포인트"
   value       = aws_eks_cluster.this.endpoint
 }
 
+output "cluster_ca_data" {
+  description = "클러스터 CA 인증서 (base64)"
+  value       = aws_eks_cluster.this.certificate_authority[0].data
+}
+
 output "cluster_version" {
-  description = "EKS 클러스터 버전"
+  description = "Kubernetes 버전"
   value       = aws_eks_cluster.this.version
 }
 
-output "cluster_iam_role_arn" {
-  description = "EKS 클러스터 IAM 역할 ARN"
-  value       = aws_iam_role.cluster.arn
+output "oidc_provider_arn" {
+  description = "OIDC Provider ARN (IRSA에서 사용)"
+  value       = aws_iam_openid_connect_provider.eks.arn
+}
+
+output "oidc_issuer_url" {
+  description = "OIDC Issuer URL"
+  value       = aws_eks_cluster.this.identity[0].oidc[0].issuer
 }
