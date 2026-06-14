@@ -415,8 +415,8 @@ module "nlb" {
   source = "../../modules/nlb"
 
   project_name = var.project_name
-  environment = var.environment
-  subnet_ids = module.vpc.private_subnet_ids
+  environment  = var.environment
+  subnet_ids   = module.vpc.private_subnet_ids
 }
 
 module "prometheus" {
