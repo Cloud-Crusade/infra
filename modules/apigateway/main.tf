@@ -11,6 +11,18 @@ resource "aws_api_gateway_rest_api" "this" {
   }
 }
 
+# VPC Link — REST API → internal NLB 사설 연결(REST API VPC Link 는 NLB 만 지원)
+resource "aws_api_gateway_vpc_link" "this" {
+  name        = "${local.name}-vpc-link"
+  target_arns = [var.nlb_arn]
+}
+
+locals {
+  # 예약은 토큰 게이트 때문에 명시 라우트로 처리 → 제네릭 프록시 대상에서 제외
+  reservation_port = var.services["reservation"].listener_port
+  proxy_services   = { for k, v in var.services : k => v if k != "reservation" }
+}
+
 # 예약 토큰(Reservation) RS256 서명 검증 Lambda authorizer
 # authorizer 람다가 S3 의 reservation 공개키로 서명 검증(공개키 위치는 authorizer 람다 env)
 # - Reservation 헤더 없음 → 403, 서명 무효 → 403, 유효 → 통과
@@ -62,7 +74,9 @@ resource "aws_api_gateway_integration" "reservations_post" {
   http_method             = aws_api_gateway_method.reservations_post.http_method
   type                    = "HTTP_PROXY"
   integration_http_method = "POST"
-  uri                     = "${var.reservation_backend_url}/reservations"
+  connection_type         = "VPC_LINK"
+  connection_id           = aws_api_gateway_vpc_link.this.id
+  uri                     = "http://${var.nlb_dns_name}:${local.reservation_port}/reservations"
 }
 
 # GET 목록 — 확인은 access 토큰만(입장 토큰 불필요)
@@ -79,7 +93,9 @@ resource "aws_api_gateway_integration" "reservations_get" {
   http_method             = aws_api_gateway_method.reservations_get.http_method
   type                    = "HTTP_PROXY"
   integration_http_method = "GET"
-  uri                     = "${var.reservation_backend_url}/reservations"
+  connection_type         = "VPC_LINK"
+  connection_id           = aws_api_gateway_vpc_link.this.id
+  uri                     = "http://${var.nlb_dns_name}:${local.reservation_port}/reservations"
 }
 
 # ===== /reservations/{reservation_id} — 확인(GET)·취소(DELETE): access 토큰만 =====
@@ -107,7 +123,9 @@ resource "aws_api_gateway_integration" "reservation_item" {
   http_method             = each.value.http_method
   type                    = "HTTP_PROXY"
   integration_http_method = each.value.http_method
-  uri                     = "${var.reservation_backend_url}/reservations/{reservation_id}"
+  connection_type         = "VPC_LINK"
+  connection_id           = aws_api_gateway_vpc_link.this.id
+  uri                     = "http://${var.nlb_dns_name}:${local.reservation_port}/reservations/{reservation_id}"
   request_parameters = {
     "integration.request.path.reservation_id" = "method.request.path.reservation_id"
   }
@@ -117,14 +135,18 @@ resource "aws_api_gateway_integration" "reservation_item" {
 # 명시 리소스라 OPTIONS 를 직접 정의해야 함. authorization=NONE + MOCK 으로 CORS 헤더만 반환
 # (POST 의 CUSTOM authorizer 는 프리플라이트(헤더 없음)를 거부하므로 OPTIONS 를 분리).
 locals {
-  cors_resources = {
-    reservations     = aws_api_gateway_resource.reservations.id
-    reservation_item = aws_api_gateway_resource.reservation_item.id
-  }
+  cors_resources = merge(
+    {
+      reservations     = aws_api_gateway_resource.reservations.id
+      reservation_item = aws_api_gateway_resource.reservation_item.id
+    },
+    { for k, r in aws_api_gateway_resource.svc_root : "${k}_root" => r.id },
+    { for k, r in aws_api_gateway_resource.svc_proxy : "${k}_proxy" => r.id },
+  )
   # 헤더 값을 한 곳에서 정의 → integration_response 와 배포 트리거가 같은 출처 참조(값 변경 시 재배포)
   cors_response_headers = {
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
     "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Reservation,Content-Type,X-Captcha-Token'"
     "method.response.header.Access-Control-Max-Age"       = "'600'"
   }
@@ -240,28 +262,62 @@ resource "aws_api_gateway_integration" "captcha_challenge" {
   uri                     = var.captcha_lambda_invoke_arn
 }
 
-# ===== 그 외 모든 경로(/{proxy+}) → app 백엔드(EKS). Authorization 은 EKS 가 판별 =====
-resource "aws_api_gateway_resource" "proxy" {
+# ===== 서비스별 경로(/auth,/events,/payments) → NLB(VPC Link). Authorization 은 백엔드가 판별 =====
+# 예약(/reservations)은 토큰 게이트 때문에 위 명시 라우트로 별도 처리. 여기선 나머지 3서비스를 제네릭 프록시로.
+# 각 서비스는 루트(/svc)와 하위(/svc/{proxy+}) 두 리소스 — 목록(GET /events)·하위경로(POST /auth/login) 모두 커버.
+resource "aws_api_gateway_resource" "svc_root" {
+  for_each    = local.proxy_services
   rest_api_id = aws_api_gateway_rest_api.this.id
   parent_id   = aws_api_gateway_rest_api.this.root_resource_id
+  path_part   = each.key
+}
+
+resource "aws_api_gateway_resource" "svc_proxy" {
+  for_each    = local.proxy_services
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_resource.svc_root[each.key].id
   path_part   = "{proxy+}"
 }
 
-resource "aws_api_gateway_method" "proxy" {
+resource "aws_api_gateway_method" "svc_root" {
+  for_each      = local.proxy_services
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.svc_root[each.key].id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "svc_root" {
+  for_each                = local.proxy_services
+  rest_api_id             = aws_api_gateway_rest_api.this.id
+  resource_id             = aws_api_gateway_resource.svc_root[each.key].id
+  http_method             = aws_api_gateway_method.svc_root[each.key].http_method
+  type                    = "HTTP_PROXY"
+  integration_http_method = "ANY"
+  connection_type         = "VPC_LINK"
+  connection_id           = aws_api_gateway_vpc_link.this.id
+  uri                     = "http://${var.nlb_dns_name}:${each.value.listener_port}/${each.key}"
+}
+
+resource "aws_api_gateway_method" "svc_proxy" {
+  for_each           = local.proxy_services
   rest_api_id        = aws_api_gateway_rest_api.this.id
-  resource_id        = aws_api_gateway_resource.proxy.id
+  resource_id        = aws_api_gateway_resource.svc_proxy[each.key].id
   http_method        = "ANY"
   authorization      = "NONE"
   request_parameters = { "method.request.path.proxy" = true }
 }
 
-resource "aws_api_gateway_integration" "proxy" {
+resource "aws_api_gateway_integration" "svc_proxy" {
+  for_each                = local.proxy_services
   rest_api_id             = aws_api_gateway_rest_api.this.id
-  resource_id             = aws_api_gateway_resource.proxy.id
-  http_method             = aws_api_gateway_method.proxy.http_method
+  resource_id             = aws_api_gateway_resource.svc_proxy[each.key].id
+  http_method             = aws_api_gateway_method.svc_proxy[each.key].http_method
   type                    = "HTTP_PROXY"
   integration_http_method = "ANY"
-  uri                     = "${var.app_backend_url}/{proxy}"
+  connection_type         = "VPC_LINK"
+  connection_id           = aws_api_gateway_vpc_link.this.id
+  uri                     = "http://${var.nlb_dns_name}:${each.value.listener_port}/${each.key}/{proxy}"
   request_parameters = {
     "integration.request.path.proxy" = "method.request.path.proxy"
   }
@@ -285,8 +341,7 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_integration.reservations_get.id,
       aws_api_gateway_method.queue.id,
       aws_api_gateway_integration.queue.id,
-      aws_api_gateway_method.proxy.id,
-      aws_api_gateway_integration.proxy.id,
+      aws_api_gateway_vpc_link.this.id,
       aws_api_gateway_authorizer.reservation.id,
       aws_api_gateway_gateway_response.unauthorized.id,
       aws_api_gateway_gateway_response.unauthorized.status_code,
@@ -297,6 +352,10 @@ resource "aws_api_gateway_deployment" "this" {
       ],
       values(aws_api_gateway_method.reservation_item)[*].id,
       values(aws_api_gateway_integration.reservation_item)[*].id,
+      values(aws_api_gateway_resource.svc_root)[*].id,
+      values(aws_api_gateway_integration.svc_root)[*].id,
+      values(aws_api_gateway_resource.svc_proxy)[*].id,
+      values(aws_api_gateway_integration.svc_proxy)[*].id,
       values(aws_api_gateway_method.cors)[*].id,
       values(aws_api_gateway_integration.cors)[*].id,
       values(aws_api_gateway_integration_response.cors)[*].status_code,
@@ -325,8 +384,8 @@ resource "aws_api_gateway_deployment" "this" {
     aws_api_gateway_integration.queue,
     aws_api_gateway_method.captcha_challenge,
     aws_api_gateway_integration.captcha_challenge,
-    aws_api_gateway_method.proxy,
-    aws_api_gateway_integration.proxy,
+    aws_api_gateway_integration.svc_root,
+    aws_api_gateway_integration.svc_proxy,
     aws_api_gateway_authorizer.reservation,
     aws_api_gateway_gateway_response.unauthorized,
     aws_api_gateway_gateway_response.access_denied

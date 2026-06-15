@@ -293,13 +293,17 @@ module "lambda" {
   }
 }
 
-# API Gateway — app/예약 백엔드는 테스트 EC2(ticketing-app), queue 는 ticketing 람다
+# API Gateway — MSA 백엔드는 internal NLB(VPC Link), queue 는 ticketing 람다
 module "apigateway" {
-  source                     = "../../modules/apigateway"
-  project_name               = var.project_name
-  environment                = var.environment
-  app_backend_url            = "http://${aws_instance.test_service.public_dns}:${var.test_service_port}"
-  reservation_backend_url    = "http://${aws_instance.test_service.public_dns}:${var.test_service_port}"
+  source       = "../../modules/apigateway"
+  project_name = var.project_name
+  environment  = var.environment
+
+  # 경로 프리픽스(/auth,/events,/reservations,/payments) → NLB 리스너 포트(VPC Link)
+  nlb_arn      = module.nlb.nlb_arn
+  nlb_dns_name = module.nlb.nlb_dns_name
+  services     = { for k, v in module.nlb.service_targets : k => { listener_port = v.listener_port } }
+
   queue_lambda_invoke_arn    = module.lambda.invoke_arns["ticketing"]
   queue_lambda_function_name = module.lambda.function_names["ticketing"]
 

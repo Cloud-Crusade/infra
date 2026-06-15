@@ -8,14 +8,23 @@ variable "environment" {
   type        = string
 }
 
-variable "app_backend_url" {
-  description = "기본 백엔드(EKS/app) base URL — Authorization 은 EKS 가 판별"
+# MSA 백엔드는 internal NLB 를 VPC Link 로 사설 연결(REST API VPC Link 는 NLB 만 지원)
+variable "nlb_arn" {
+  description = "VPC Link 대상 internal NLB ARN"
   type        = string
 }
 
-variable "reservation_backend_url" {
-  description = "예약 경로 백엔드 base URL (테스트용 EC2)"
+variable "nlb_dns_name" {
+  description = "NLB DNS 이름 (통합 uri 호스트)"
   type        = string
+}
+
+# 서비스명 → NLB 리스너 포트. 경로 프리픽스(/auth,/events,/reservations,/payments)별 백엔드 분리
+variable "services" {
+  description = "외부 노출 서비스 → NLB 리스너 포트 (auth|event|reservation|payment)"
+  type = map(object({
+    listener_port = number
+  }))
 }
 
 variable "queue_lambda_invoke_arn" {
