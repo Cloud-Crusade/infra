@@ -19,11 +19,13 @@ variable "nlb_dns_name" {
   type        = string
 }
 
-# 서비스명 → NLB 리스너 포트. 경로 프리픽스(/auth,/events,/reservations,/payments)별 백엔드 분리
+# 서비스명 → { NLB 리스너 포트, URL 경로 }. path 는 백엔드 FastAPI 라우터 prefix 와 일치해야 함
+# (event→/events, payment→/payments). HTTP_PROXY 가 프리픽스를 포함해 그대로 전달.
 variable "services" {
-  description = "외부 노출 서비스 → NLB 리스너 포트 (auth|event|reservation|payment)"
+  description = "외부 노출 서비스 → { listener_port, path } (auth|event|reservation|payment)"
   type = map(object({
     listener_port = number
+    path          = string
   }))
 }
 

@@ -300,9 +300,15 @@ module "apigateway" {
   environment  = var.environment
 
   # 경로 프리픽스(/auth,/events,/reservations,/payments) → NLB 리스너 포트(VPC Link)
+  # path 는 백엔드 FastAPI 라우터 prefix 와 일치(event→/events, payment→/payments)
   nlb_arn      = module.nlb.nlb_arn
   nlb_dns_name = module.nlb.nlb_dns_name
-  services     = { for k, v in module.nlb.service_targets : k => { listener_port = v.listener_port } }
+  services = {
+    for k, v in module.nlb.service_targets : k => {
+      listener_port = v.listener_port
+      path          = { auth = "auth", event = "events", reservation = "reservations", payment = "payments" }[k]
+    }
+  }
 
   queue_lambda_invoke_arn    = module.lambda.invoke_arns["ticketing"]
   queue_lambda_function_name = module.lambda.function_names["ticketing"]

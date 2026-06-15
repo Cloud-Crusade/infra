@@ -269,7 +269,7 @@ resource "aws_api_gateway_resource" "svc_root" {
   for_each    = local.proxy_services
   rest_api_id = aws_api_gateway_rest_api.this.id
   parent_id   = aws_api_gateway_rest_api.this.root_resource_id
-  path_part   = each.key
+  path_part   = each.value.path
 }
 
 resource "aws_api_gateway_resource" "svc_proxy" {
@@ -296,7 +296,7 @@ resource "aws_api_gateway_integration" "svc_root" {
   integration_http_method = "ANY"
   connection_type         = "VPC_LINK"
   connection_id           = aws_api_gateway_vpc_link.this.id
-  uri                     = "http://${var.nlb_dns_name}:${each.value.listener_port}/${each.key}"
+  uri                     = "http://${var.nlb_dns_name}:${each.value.listener_port}/${each.value.path}"
 }
 
 resource "aws_api_gateway_method" "svc_proxy" {
@@ -317,7 +317,7 @@ resource "aws_api_gateway_integration" "svc_proxy" {
   integration_http_method = "ANY"
   connection_type         = "VPC_LINK"
   connection_id           = aws_api_gateway_vpc_link.this.id
-  uri                     = "http://${var.nlb_dns_name}:${each.value.listener_port}/${each.key}/{proxy}"
+  uri                     = "http://${var.nlb_dns_name}:${each.value.listener_port}/${each.value.path}/{proxy}"
   request_parameters = {
     "integration.request.path.proxy" = "method.request.path.proxy"
   }
@@ -353,8 +353,10 @@ resource "aws_api_gateway_deployment" "this" {
       values(aws_api_gateway_method.reservation_item)[*].id,
       values(aws_api_gateway_integration.reservation_item)[*].id,
       values(aws_api_gateway_resource.svc_root)[*].id,
+      values(aws_api_gateway_method.svc_root)[*].id,
       values(aws_api_gateway_integration.svc_root)[*].id,
       values(aws_api_gateway_resource.svc_proxy)[*].id,
+      values(aws_api_gateway_method.svc_proxy)[*].id,
       values(aws_api_gateway_integration.svc_proxy)[*].id,
       values(aws_api_gateway_method.cors)[*].id,
       values(aws_api_gateway_integration.cors)[*].id,
