@@ -416,6 +416,20 @@ module "nlb" {
   subnet_ids   = module.vpc.private_subnet_ids
 }
 
+# AWS Load Balancer Controller — terraform 소유 NLB 타겟그룹에 파드 IP 를 등록(TargetGroupBinding)하기 위한 컨트롤러
+module "aws_lb_controller" {
+  source = "../../modules/aws_lb_controller"
+
+  project_name = var.project_name
+  environment  = var.environment
+  cluster_name = module.eks.cluster_name
+  region       = var.aws_region
+  vpc_id       = module.vpc.vpc_id
+
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_provider_url = module.eks.oidc_issuer_url
+}
+
 module "prometheus" {
   source = "../../modules/prometheus"
 
