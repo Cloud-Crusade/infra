@@ -416,6 +416,7 @@ module "nlb" {
   subnet_ids   = module.vpc.private_subnet_ids
   vpc_id       = module.vpc.vpc_id
   vpc_cidr     = module.vpc.vpc_cidr
+  target_port  = var.ticketing_http_port
 
   # 4서비스 외부 노출 — 포트로 분리, API GW(#136)가 경로별로 연결
   services = {
@@ -426,13 +427,13 @@ module "nlb" {
   }
 }
 
-# NLB(ip 타겟) → 파드 8000 — 클러스터 SG(관리형 노드그룹·파드 ENI)에 인바운드 허용
+# NLB(ip 타겟) → 파드 수신 포트 — 클러스터 SG(관리형 노드그룹·파드 ENI)에 인바운드 허용
 resource "aws_security_group_rule" "pods_from_nlb" {
   type                     = "ingress"
   security_group_id        = module.eks.cluster_security_group_id
   source_security_group_id = module.nlb.nlb_sg_id
-  from_port                = 8000
-  to_port                  = 8000
+  from_port                = var.ticketing_http_port
+  to_port                  = var.ticketing_http_port
   protocol                 = "tcp"
   description              = "ticketing pods from NLB"
 }

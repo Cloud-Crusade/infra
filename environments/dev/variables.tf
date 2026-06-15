@@ -272,3 +272,19 @@ variable "eks_access_entries" {
   }))
   default = []
 }
+
+# TargetGroupBinding(kubernetes_manifest)은 plan 시 클러스터+CRD 접속이 필요 → clean-room plan 에선 false.
+# LB Controller(CRD) 설치 후 2단계로 true 적용(TF_VAR_enable_nlb_binding=true).
+variable "enable_nlb_binding" {
+  description = "NLB 타겟그룹 ↔ 파드 IP TargetGroupBinding 생성 여부"
+  type        = bool
+  default     = false
+}
+
+# ticketing 서비스 수신 포트 단일 소스 — NLB 타겟그룹 port·파드 SG 인바운드·TargetGroupBinding serviceRef 가 공유.
+# eks 서비스 모듈 http_port(기본 8000)와 일치해야 함.
+variable "ticketing_http_port" {
+  description = "ticketing 서비스 HTTP 포트 (NLB 타겟·SG·TargetGroupBinding 공통)"
+  type        = number
+  default     = 8000
+}
