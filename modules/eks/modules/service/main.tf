@@ -205,13 +205,17 @@ resource "kubernetes_horizontal_pod_autoscaler_v2" "this" {
         }
       }
     }
-    metric {
-      type = "Resource"
-      resource {
-        name = "memory"
-        target {
-          type                = "Utilization"
-          average_utilization = 70
+    # 메모리 메트릭은 opt-in — Python 런타임 특성상 사용률이 떨어지지 않아 scale-in 을 막음
+    dynamic "metric" {
+      for_each = var.enable_memory_autoscaling ? [1] : []
+      content {
+        type = "Resource"
+        resource {
+          name = "memory"
+          target {
+            type                = "Utilization"
+            average_utilization = 70
+          }
         }
       }
     }

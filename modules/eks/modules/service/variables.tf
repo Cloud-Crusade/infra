@@ -27,6 +27,12 @@ variable "max_replicas" {
   default = 10
 }
 
+variable "enable_memory_autoscaling" {
+  description = "메모리 기반 HPA 활성화 유무"
+  type        = bool
+  default     = false
+}
+
 variable "http_port" {
   type    = number
   default = 8000
