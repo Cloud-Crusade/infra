@@ -150,6 +150,15 @@ resource "kubernetes_job_v1" "db_bootstrap" {
     create = "5m"
   }
 
+  # 완료된 Job 은 자동 재실행되지 않음 — 롤 비밀번호(random_password) 회전·롤 추가 시
+  # SQL/시크릿이 바뀌면 Job 을 재생성해 재실행(role.sql 은 멱등이라 안전)
+  lifecycle {
+    replace_triggered_by = [
+      kubernetes_config_map_v1.db_bootstrap_sql,
+      kubernetes_secret_v1.db_bootstrap,
+    ]
+  }
+
   depends_on = [
     kubernetes_service_v1.rds_core_writer,
     kubernetes_service_v1.rds_reservation_writer,
