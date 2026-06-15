@@ -23,15 +23,11 @@ export const options = {
 };
 
 // ==========================================
-//  [설정 사항] 환경 변수(Environment Variable) 적용
+//  [설정 사항] 모든 민감/설정 정보를 환경 변수에서 동적으로 로드
 // ==========================================
 const CONFIG = {
-
-    // Git에 공유되어도 안전한 엔드포인트 정보
-    BASE_URL: 'https://yeuc9w7wyj.execute-api.ap-northeast-2.amazonaws.com/dev',
-    EVENT_ID: 'concert-2026',
-
-    // 🔥 보안 위협이 되는 실제 대칭키는 환경 변수에서 동적으로 읽어옵니다.
+    BASE_URL: __ENV.BASE_URL,
+    EVENT_ID: __ENV.EVENT_ID,
     JWT_SECRET_KEY: __ENV.JWT_SECRET_KEY
 };
 
@@ -61,9 +57,14 @@ function generateTestToken(userId, secret) {
 }
 
 export function setup() {
-    // 실행 시 환경 변수가 누락되었는지 검증합니다.
-    if (!CONFIG.JWT_SECRET_KEY) {
-        throw new Error('[실행 실패] JWT_SECRET_KEY 환경 변수가 설정되지 않았습니다. 테스트를 시작할 수 없습니다.');
+    // 💡 테스트 실행 전 필수 환경 변수 3종이 모두 주입되었는지 검증
+    const missingVars = [];
+    if (!CONFIG.BASE_URL) missingVars.push('BASE_URL');
+    if (!CONFIG.EVENT_ID) missingVars.push('EVENT_ID');
+    if (!CONFIG.JWT_SECRET_KEY) missingVars.push('JWT_SECRET_KEY');
+
+    if (missingVars.length > 0) {
+        throw new Error(`[실행 실패] 필수 환경 변수가 누락되었습니다: ${missingVars.join(', ')}`);
     }
     return {};
 }
@@ -73,7 +74,7 @@ export default function (data) {
     const uniqueUserId = `user_${__VU}_${__ITER}`;
     const token = generateTestToken(uniqueUserId, CONFIG.JWT_SECRET_KEY);
 
-    // 엔드포인트 주소 규칙 매핑: /dev/queue/{event_id}
+    // Lambda Function URL 매핑 규칙: /queue/{event_id}
     const TARGET_URL = `${CONFIG.BASE_URL}/queue/${CONFIG.EVENT_ID}`;
 
     const params = {
@@ -107,7 +108,7 @@ export default function (data) {
 
     // 상세 에러 핸들링 모니터링 로그
     if (res.status === 401) {
-        console.error(`[인증 오류] JWT_SECRET_KEY가 AWS 비밀키와 일치하지 않습니다.`);
+        console.error(`[인증 오류] JWT_SECRET_KEY가 일치하지 않습니다.`);
     } else if (res.status === 400 || res.status === 404) {
         console.error(`[경로 오류] 주소가 유효하지 않거나 파라미터가 유실되었습니다. (요청 주소: ${TARGET_URL})`);
     } else if (res.status === 500) {
