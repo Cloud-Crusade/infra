@@ -44,7 +44,7 @@ variable "health_check_path" {
   default     = "/readyz"
 }
 
-variable "enable_detection_protection" {
+variable "enable_deletion_protection" {
   description = "NLB 삭제 방지 활성화 여부"
   type        = bool
   default     = false

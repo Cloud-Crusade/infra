@@ -5,7 +5,7 @@ resource "aws_lb" "this" {
   subnets            = var.subnet_ids
   security_groups    = [aws_security_group.nlb.id]
 
-  enable_deletion_protection = var.enable_detection_protection
+  enable_deletion_protection = var.enable_deletion_protection
 
   enable_zonal_shift = var.enable_zonal_shift
 
@@ -15,7 +15,8 @@ resource "aws_lb" "this" {
 }
 
 # NLB SG — 리스너 포트 인바운드(VPC Link ENI=VPC 내부), 파드 타겟 포트 egress
-# 주의: NLB 의 SG 는 생성 시에만 부착 가능 → 기존 SG 없는 NLB 에 추가하면 교체됨
+# 주의: SG 는 NLB 생성 시에만 최초 부착 가능(SG 보유 NLB 는 이후 in-place 변경 가능하나,
+#       SG 없이 생성된 NLB 엔 사후 추가 불가) → 기존 main-lb 가 SG 없이 떠 있으면 이 변경은 교체 유발
 resource "aws_security_group" "nlb" {
   name        = "${var.project_name}-${var.environment}-nlb-sg"
   description = "ticketing NLB listener ingress / pod egress"
