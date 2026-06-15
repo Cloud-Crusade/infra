@@ -28,6 +28,11 @@ output "oidc_issuer_url" {
   value       = aws_eks_cluster.this.identity[0].oidc[0].issuer
 }
 
+output "cluster_security_group_id" {
+  description = "EKS 관리 클러스터 보안 그룹 ID (관리형 노드그룹·파드 ENI 에 적용 — NLB→파드 인바운드 대상)"
+  value       = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
+}
+
 # ===== MSA 워크로드 =====
 output "ticketing_namespace" {
   description = "ticketing 워크로드 네임스페이스"
