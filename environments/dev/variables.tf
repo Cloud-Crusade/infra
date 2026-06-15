@@ -272,3 +272,11 @@ variable "eks_access_entries" {
   }))
   default = []
 }
+
+# TargetGroupBinding(kubernetes_manifest)은 plan 시 클러스터+CRD 접속이 필요 → clean-room plan 에선 false.
+# LB Controller(CRD) 설치 후 2단계로 true 적용(TF_VAR_enable_nlb_binding=true).
+variable "enable_nlb_binding" {
+  description = "NLB 타겟그룹 ↔ 파드 IP TargetGroupBinding 생성 여부"
+  type        = bool
+  default     = false
+}
