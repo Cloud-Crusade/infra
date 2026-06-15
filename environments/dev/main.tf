@@ -448,6 +448,11 @@ resource "aws_security_group_rule" "pods_from_nlb" {
   description              = "ticketing pods from NLB"
 }
 
+# metrics-server — HPA(eks_service)가 CPU/메모리 사용률로 스케일하도록 리소스 메트릭 제공
+module "metrics_server" {
+  source = "../../modules/metrics_server"
+}
+
 # AWS Load Balancer Controller — terraform 소유 NLB 타겟그룹에 파드 IP 를 등록(TargetGroupBinding)하기 위한 컨트롤러
 module "aws_lb_controller" {
   source = "../../modules/aws_lb_controller"
