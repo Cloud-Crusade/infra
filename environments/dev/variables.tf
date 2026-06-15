@@ -280,3 +280,11 @@ variable "enable_nlb_binding" {
   type        = bool
   default     = false
 }
+
+# ticketing 서비스 수신 포트 단일 소스 — NLB 타겟그룹 port·파드 SG 인바운드·TargetGroupBinding serviceRef 가 공유.
+# eks 서비스 모듈 http_port(기본 8000)와 일치해야 함.
+variable "ticketing_http_port" {
+  description = "ticketing 서비스 HTTP 포트 (NLB 타겟·SG·TargetGroupBinding 공통)"
+  type        = number
+  default     = 8000
+}
