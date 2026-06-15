@@ -28,55 +28,45 @@ resource "aws_iam_openid_connect_provider" "eks" {
   url             = aws_eks_cluster.this.identity[0].oidc[0].issuer
 }
 
-# system 노드 그룹
-resource "aws_eks_node_group" "system" {
-  cluster_name    = aws_eks_cluster.this.name
-  node_group_name = "${local.cluster_name}-system-ng"
-  node_role_arn   = var.node_role_arn
-  subnet_ids      = var.subnet_ids
-
-  capacity_type  = var.system_ng_capacity_type
-  instance_types = var.system_ng_instance_types
-  disk_size      = var.system_ng_disk_size
-  ami_type       = "AL2023_x86_64_STANDARD"
-
-  scaling_config {
-    desired_size = var.system_ng_desired_size
-    max_size     = var.system_ng_max_size
-    min_size     = var.system_ng_min_size
-  }
-
-  update_config {
-    max_unavailable = 1
-  }
-
-  taint {
-    key    = "dedicated"
-    value  = "system"
-    effect = "NO_SCHEDULE"
-  }
-
-  labels = {
-    role = "system"
+# 노드 그룹 — system(전용 워크로드)·app(애플리케이션 전용). taint value·label role 은 키와 동일
+locals {
+  node_groups = {
+    system = {
+      capacity_type  = var.system_ng_capacity_type
+      instance_types = var.system_ng_instance_types
+      disk_size      = var.system_ng_disk_size
+      desired_size   = var.system_ng_desired_size
+      min_size       = var.system_ng_min_size
+      max_size       = var.system_ng_max_size
+    }
+    app = {
+      capacity_type  = var.app_ng_capacity_type
+      instance_types = var.app_ng_instance_types
+      disk_size      = var.app_ng_disk_size
+      desired_size   = var.app_ng_desired_size
+      min_size       = var.app_ng_min_size
+      max_size       = var.app_ng_max_size
+    }
   }
 }
 
-# app 노드 그룹 — 애플리케이션 워크로드 전용
-resource "aws_eks_node_group" "app" {
+resource "aws_eks_node_group" "this" {
+  for_each = local.node_groups
+
   cluster_name    = aws_eks_cluster.this.name
-  node_group_name = "${local.cluster_name}-app-ng"
+  node_group_name = "${local.cluster_name}-${each.key}-ng"
   node_role_arn   = var.node_role_arn
   subnet_ids      = var.subnet_ids
 
-  capacity_type  = var.app_ng_capacity_type
-  disk_size      = var.app_ng_disk_size
-  instance_types = var.app_ng_instance_types
+  capacity_type  = each.value.capacity_type
+  instance_types = each.value.instance_types
+  disk_size      = each.value.disk_size
   ami_type       = "AL2023_x86_64_STANDARD"
 
   scaling_config {
-    desired_size = var.app_ng_desired_size
-    max_size     = var.app_ng_max_size
-    min_size     = var.app_ng_min_size
+    desired_size = each.value.desired_size
+    max_size     = each.value.max_size
+    min_size     = each.value.min_size
   }
 
   update_config {
@@ -85,12 +75,12 @@ resource "aws_eks_node_group" "app" {
 
   taint {
     key    = "dedicated"
-    value  = "app"
+    value  = each.key
     effect = "NO_SCHEDULE"
   }
 
   labels = {
-    role = "app"
+    role = each.key
   }
 }
 
@@ -101,7 +91,7 @@ resource "aws_eks_addon" "vpc_cni" {
   addon_version            = "v1.18.3-eksbuild.1"
   service_account_role_arn = var.vpc_cni_role_arn
 
-  depends_on = [aws_eks_node_group.system, aws_eks_node_group.app]
+  depends_on = [aws_eks_node_group.this]
 }
 
 resource "aws_eks_addon" "kube_proxy" {
@@ -109,7 +99,7 @@ resource "aws_eks_addon" "kube_proxy" {
   addon_name    = "kube-proxy"
   addon_version = "v1.32.0-eksbuild.2"
 
-  depends_on = [aws_eks_node_group.system, aws_eks_node_group.app]
+  depends_on = [aws_eks_node_group.this]
 }
 
 resource "aws_eks_addon" "coredns" {
@@ -117,7 +107,7 @@ resource "aws_eks_addon" "coredns" {
   addon_name    = "coredns"
   addon_version = "v1.11.4-eksbuild.2"
 
-  depends_on = [aws_eks_node_group.system, aws_eks_node_group.app]
+  depends_on = [aws_eks_node_group.this]
 }
 
 resource "aws_eks_addon" "ebs_csi_driver" {
@@ -126,7 +116,7 @@ resource "aws_eks_addon" "ebs_csi_driver" {
   addon_version            = "v1.38.1-eksbuild.1"
   service_account_role_arn = var.ebs_csi_role_arn
 
-  depends_on = [aws_eks_node_group.system, aws_eks_node_group.app]
+  depends_on = [aws_eks_node_group.this]
 }
 
 # 7. 클러스터 접근 제어
