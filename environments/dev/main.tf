@@ -414,6 +414,27 @@ module "nlb" {
   project_name = var.project_name
   environment  = var.environment
   subnet_ids   = module.vpc.private_subnet_ids
+  vpc_id       = module.vpc.vpc_id
+  vpc_cidr     = module.vpc.vpc_cidr
+
+  # 4서비스 외부 노출 — 포트로 분리, API GW(#136)가 경로별로 연결
+  services = {
+    auth        = { listener_port = 8001 }
+    event       = { listener_port = 8002 }
+    reservation = { listener_port = 8003 }
+    payment     = { listener_port = 8004 }
+  }
+}
+
+# NLB(ip 타겟) → 파드 8000 — 클러스터 SG(관리형 노드그룹·파드 ENI)에 인바운드 허용
+resource "aws_security_group_rule" "pods_from_nlb" {
+  type                     = "ingress"
+  security_group_id        = module.eks.cluster_security_group_id
+  source_security_group_id = module.nlb.nlb_sg_id
+  from_port                = 8000
+  to_port                  = 8000
+  protocol                 = "tcp"
+  description              = "ticketing pods from NLB"
 }
 
 # AWS Load Balancer Controller — terraform 소유 NLB 타겟그룹에 파드 IP 를 등록(TargetGroupBinding)하기 위한 컨트롤러

@@ -17,3 +17,18 @@ output "nlb_zone_id" {
   description = "NLB Route 53 호스팅 영역 ID"
   value       = aws_lb.this.zone_id
 }
+
+output "nlb_sg_id" {
+  description = "NLB 보안 그룹 ID (파드 SG 인바운드 소스)"
+  value       = aws_security_group.nlb.id
+}
+
+output "service_targets" {
+  description = "서비스명 → { listener_port, target_group_arn } (TargetGroupBinding·API GW 배선용)"
+  value = {
+    for k, tg in aws_lb_target_group.svc : k => {
+      listener_port    = var.services[k].listener_port
+      target_group_arn = tg.arn
+    }
+  }
+}
