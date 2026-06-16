@@ -126,11 +126,6 @@ module "cluster" {
   app_ng_min_size       = var.eks_app_ng_min_size
   app_ng_max_size       = var.eks_app_ng_max_size
 
-  cluster_role_arn = module.iam.cluster_role_arn
-  node_role_arn    = module.iam.ng_role_arn
-  vpc_cni_role_arn = module.iam.vpc_cni_role_arn
-  ebs_csi_role_arn = module.iam.ebs_csi_role_arn
-
   domain_name         = var.domain_name
   captcha_enabled     = var.captcha_enabled
   ticketing_image_tag = var.ticketing_image_tag
@@ -176,13 +171,6 @@ module "data" {
   captcha_hmac_secret_value     = random_password.captcha_hmac.result
 }
 
-module "iam" {
-  source            = "../../modules/iam"
-  project_name      = var.project_name
-  environment       = var.environment
-  oidc_provider_arn = var.oidc_provider_arn
-  oidc_provider_url = var.oidc_provider_url
-}
 # 클라이언트 정적 호스팅(CloudFront + www ACM). acm_www 는 us-east-1 전용 → aliased provider 전달
 module "frontend" {
   source = "../../modules/frontend"
@@ -207,7 +195,6 @@ module "async" {
   project_name = var.project_name
   environment  = var.environment
 
-  lambda_role_arn             = module.iam.lambda_role_arn
   lambda_sg_id                = module.security_groups.lambda_sg_id
   vpc_subnet_ids              = module.network.private_subnet_ids
   secrets_extension_layer_arn = var.secrets_extension_layer_arn

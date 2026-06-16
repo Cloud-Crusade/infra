@@ -4,7 +4,7 @@ locals {
 
 resource "aws_eks_cluster" "this" {
   name     = local.cluster_name
-  role_arn = var.cluster_role_arn
+  role_arn = aws_iam_role.eks_cluster.arn
 
   vpc_config {
     subnet_ids              = var.subnet_ids
@@ -16,6 +16,9 @@ resource "aws_eks_cluster" "this" {
   version = var.cluster_version
 
   enabled_cluster_log_types = var.cluster_enabled_log_types
+
+  # 컨트롤플레인 기동 전 클러스터 정책 연결 보장
+  depends_on = [aws_iam_role_policy_attachment.eks_cluster]
 }
 
 data "tls_certificate" "eks_oidc" {
@@ -55,7 +58,7 @@ resource "aws_eks_node_group" "this" {
 
   cluster_name    = aws_eks_cluster.this.name
   node_group_name = "${local.cluster_name}-${each.key}-ng"
-  node_role_arn   = var.node_role_arn
+  node_role_arn   = aws_iam_role.eks_node.arn
   subnet_ids      = var.subnet_ids
 
   capacity_type  = each.value.capacity_type
@@ -82,6 +85,13 @@ resource "aws_eks_node_group" "this" {
   labels = {
     role = each.key
   }
+
+  # 노드 부트스트랩(클러스터 join·ECR pull) 전 노드 정책 연결 보장
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_node_worker,
+    aws_iam_role_policy_attachment.eks_node_cni,
+    aws_iam_role_policy_attachment.eks_node_ecr,
+  ]
 }
 
 # Cluster Autoscaler 자동탐색 태그 — 노드그룹 ASG 에 명시 부착.
@@ -108,9 +118,10 @@ resource "aws_eks_addon" "vpc_cni" {
   cluster_name             = aws_eks_cluster.this.name
   addon_name               = "vpc-cni"
   addon_version            = "v1.18.3-eksbuild.1"
-  service_account_role_arn = var.vpc_cni_role_arn
+  service_account_role_arn = aws_iam_role.vpc_cni.arn
 
-  depends_on = [aws_eks_node_group.this]
+  # IRSA 정책 연결 후 애드온 적용(aws-node 가 ENI 관리 권한 확보)
+  depends_on = [aws_eks_node_group.this, aws_iam_role_policy_attachment.vpc_cni]
 }
 
 resource "aws_eks_addon" "kube_proxy" {
@@ -133,9 +144,9 @@ resource "aws_eks_addon" "ebs_csi_driver" {
   cluster_name             = aws_eks_cluster.this.name
   addon_name               = "aws-ebs-csi-driver"
   addon_version            = "v1.38.1-eksbuild.1"
-  service_account_role_arn = var.ebs_csi_role_arn
+  service_account_role_arn = aws_iam_role.ebs_csi.arn
 
-  depends_on = [aws_eks_node_group.this]
+  depends_on = [aws_eks_node_group.this, aws_iam_role_policy_attachment.ebs_csi]
 }
 
 # 7. 클러스터 접근 제어

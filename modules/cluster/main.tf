@@ -25,11 +25,6 @@ module "eks" {
   app_ng_min_size       = var.app_ng_min_size
   app_ng_max_size       = var.app_ng_max_size
 
-  cluster_role_arn = var.cluster_role_arn
-  node_role_arn    = var.node_role_arn
-  vpc_cni_role_arn = var.vpc_cni_role_arn
-  ebs_csi_role_arn = var.ebs_csi_role_arn
-
   access_entries = var.access_entries
 }
 
