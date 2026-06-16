@@ -231,28 +231,29 @@ module "iam" {
   oidc_provider_arn = var.oidc_provider_arn
   oidc_provider_url = var.oidc_provider_url
 }
-# www 커스텀 도메인용 ACM 인증서 — CloudFront 는 us-east-1 인증서만 허용
-module "acm_www" {
-  source = "../../modules/acm"
+# 클라이언트 정적 호스팅(CloudFront + www ACM). acm_www 는 us-east-1 전용 → aliased provider 전달
+module "frontend" {
+  source = "../../modules/frontend"
   providers = {
-    aws = aws.us_east_1
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
   }
 
-  domain_name     = "www.${var.domain_name}"
-  route53_zone_id = var.route53_zone_id
+  project_name              = var.project_name
+  environment               = var.environment
+  domain_name               = var.domain_name
+  route53_zone_id           = var.route53_zone_id
+  public_bucket             = var.public_bucket
+  public_bucket_domain_name = var.public_bucket_domain_name
 }
 
-module "cloudfront" {
-  source       = "../../modules/cloudfront"
-  project_name = var.project_name
-  environment  = var.environment
-  # web 정적 호스팅 + JWT 공개키가 같은 public 버킷 → CloudFront 로 접근 비용 절감
-  s3_bucket_name                 = var.public_bucket
-  s3_bucket_regional_domain_name = var.public_bucket_domain_name
-
-  # www 커스텀 도메인 + us-east-1 ACM 인증서
-  aliases             = ["www.${var.domain_name}"]
-  acm_certificate_arn = module.acm_www.certificate_arn
+moved {
+  from = module.acm_www
+  to   = module.frontend.module.acm_www
+}
+moved {
+  from = module.cloudfront
+  to   = module.frontend.module.cloudfront
 }
 
 # 비동기/서버리스 — lambda·sqs·eventbridge + persistence SQS→Lambda 트리거
@@ -271,7 +272,7 @@ module "async" {
   waiting_room_cache_endpoint        = module.data.waiting_room_cache_endpoint
   reservation_private_key_secret_arn = module.data.reservation_private_key_secret_arn
   authorization_secret_arn           = module.data.authorization_secret_arn
-  cloudfront_domain_name             = module.cloudfront.cloudfront_domain_name
+  cloudfront_domain_name             = module.frontend.cloudfront_domain_name
 
   db_name     = var.db_name
   db_username = var.db_username
@@ -355,7 +356,7 @@ module "route53" {
   route53_zone_id = var.route53_zone_id
 
   # www → CloudFront (클라이언트 정적 호스팅)
-  cloudfront_domain_name = module.cloudfront.cloudfront_domain_name
+  cloudfront_domain_name = module.frontend.cloudfront_domain_name
   cloudfront_zone_id     = var.cloudfront_zone_id
 
   # api → API Gateway 커스텀 도메인 (REGIONAL)
@@ -386,7 +387,7 @@ module "cloudwatch" {
   ]
 
   # CloudFront
-  cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
+  cloudfront_distribution_id = module.frontend.cloudfront_distribution_id
 
   # ElastiCache
   elasticache_cluster_ids = [
