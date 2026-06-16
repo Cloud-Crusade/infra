@@ -22,7 +22,8 @@ locals {
   # 백엔드 선택: eks(NLB VPC Link, 서비스별 포트) | test_ec2(단일 nginx 게이트웨이, INTERNET)
   use_eks   = var.backend == "eks"
   conn_type = local.use_eks ? "VPC_LINK" : "INTERNET"
-  conn_id   = one(aws_api_gateway_vpc_link.this[*].id)
+  # vpc_link 는 eks 일 때만 1개 → one() 으로 id 추출(test_ec2 면 0개 → null=connection_id 생략). count=0 시 this[0] 인덱스 에러 회피
+  conn_id = one(aws_api_gateway_vpc_link.this[*].id)
   # 서비스명 → 통합 base url. test_ec2 는 nginx 게이트웨이가 경로별 라우팅하므로 전 서비스 동일 host:port
   svc_base = {
     for k, v in var.services : k => local.use_eks ? "http://${var.nlb_dns_name}:${v.listener_port}" : var.test_backend_url
