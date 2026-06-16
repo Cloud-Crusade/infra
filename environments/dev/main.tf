@@ -310,59 +310,43 @@ moved {
   to   = module.async.module.lambda.aws_cloudwatch_log_group.this["persistence"]
 }
 
-# API Gateway — 백엔드(EKS NLB ↔ test-EC2)는 var.api_backend 로 선택, queue 는 ticketing 람다
-module "apigateway" {
-  source       = "../../modules/apigateway"
+# API 라우팅 — apigateway·nlb·route53. test_backend_url 은 ops 의 test_service, 백엔드 람다는 async
+module "api" {
+  source = "../../modules/api"
+
   project_name = var.project_name
   environment  = var.environment
 
-  # 백엔드 선택 — eks(NLB VPC Link) | test_ec2(단일 nginx 게이트웨이)
-  backend          = var.api_backend
+  subnet_ids          = module.network.private_subnet_ids
+  vpc_id              = module.network.vpc_id
+  vpc_cidr            = module.network.vpc_cidr
+  ticketing_http_port = var.ticketing_http_port
+
+  api_backend      = var.api_backend
   test_backend_url = "http://${aws_instance.test_service.public_dns}:${var.test_service_port}"
 
-  # 경로 프리픽스(/auth,/events,/reservations,/payments) → NLB 리스너 포트(VPC Link)
-  # path 는 백엔드 FastAPI 라우터 prefix 와 일치(event→/events, payment→/payments)
-  nlb_arn      = module.nlb.nlb_arn
-  nlb_dns_name = module.nlb.nlb_dns_name
-  services = {
-    for k, v in module.nlb.service_targets : k => {
-      listener_port = v.listener_port
-      path          = { auth = "auth", event = "events", reservation = "reservations", payment = "payments" }[k]
-    }
-  }
+  lambda_invoke_arns    = module.async.invoke_arns
+  lambda_function_names = module.async.function_names
 
-  queue_lambda_invoke_arn    = module.async.invoke_arns["ticketing"]
-  queue_lambda_function_name = module.async.function_names["ticketing"]
-
-  # captcha Lambda 가 배포(lambda-modules.txt 등록)됐을 때만 라우트 생성 — 미배포 시 plan 실패 방지
-  enable_captcha_route         = contains(keys(module.async.function_names), "captcha")
-  captcha_lambda_invoke_arn    = lookup(module.async.invoke_arns, "captcha", "")
-  captcha_lambda_function_name = lookup(module.async.function_names, "captcha", "")
-
-  authorizer_lambda_invoke_arn    = module.async.invoke_arns["authorizer"]
-  authorizer_lambda_function_name = module.async.function_names["authorizer"]
-
-  # 커스텀 도메인 (api.<domain>) — REGIONAL + ACM(DNS 검증, 기존 존 사용)
-  api_domain_name = "api.${var.domain_name}"
-  route53_zone_id = var.route53_zone_id
-}
-
-# Route53 레코드 — www → CloudFront(클라이언트), api → ALB(서버)
-# 호스팅 영역은 기존 존 참조(route53_zone_id). api 는 apigateway 커스텀 도메인(REGIONAL) 출력으로 연결.
-module "route53" {
-  source = "../../modules/route53"
-
-  domain_name     = var.domain_name
-  route53_zone_id = var.route53_zone_id
-
-  # www → CloudFront (클라이언트 정적 호스팅)
+  domain_name            = var.domain_name
+  route53_zone_id        = var.route53_zone_id
   cloudfront_domain_name = module.frontend.cloudfront_domain_name
   cloudfront_zone_id     = var.cloudfront_zone_id
-
-  # api → API Gateway 커스텀 도메인 (REGIONAL)
-  api_target_dns_name = module.apigateway.domain_regional_target
-  api_target_zone_id  = module.apigateway.domain_regional_zone_id
 }
+
+moved {
+  from = module.apigateway
+  to   = module.api.module.apigateway
+}
+moved {
+  from = module.nlb
+  to   = module.api.module.nlb
+}
+moved {
+  from = module.route53
+  to   = module.api.module.route53
+}
+
 module "cloudwatch" {
   source = "../../modules/cloudwatch"
 
@@ -405,30 +389,11 @@ module "cloudwatch" {
   api_gateway_name = ""
 }
 
-module "nlb" {
-  source = "../../modules/nlb"
-
-  project_name = var.project_name
-  environment  = var.environment
-  subnet_ids   = module.network.private_subnet_ids
-  vpc_id       = module.network.vpc_id
-  vpc_cidr     = module.network.vpc_cidr
-  target_port  = var.ticketing_http_port
-
-  # 4서비스 외부 노출 — 포트로 분리, API GW(#136)가 경로별로 연결
-  services = {
-    auth        = { listener_port = 8001 }
-    event       = { listener_port = 8002 }
-    reservation = { listener_port = 8003 }
-    payment     = { listener_port = 8004 }
-  }
-}
-
 # NLB(ip 타겟) → 파드 수신 포트 — 클러스터 SG(관리형 노드그룹·파드 ENI)에 인바운드 허용
 resource "aws_security_group_rule" "pods_from_nlb" {
   type                     = "ingress"
   security_group_id        = module.cluster.cluster_security_group_id
-  source_security_group_id = module.nlb.nlb_sg_id
+  source_security_group_id = module.api.nlb_sg_id
   from_port                = var.ticketing_http_port
   to_port                  = var.ticketing_http_port
   protocol                 = "tcp"

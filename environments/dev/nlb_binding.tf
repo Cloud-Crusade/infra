@@ -5,7 +5,7 @@
 # var.enable_nlb_binding 로 게이팅 — clean-room plan 에선 0개, 컨트롤러 설치 후 2단계 apply 로 활성화.
 # spec.networking 미지정 → 컨트롤러가 SG 를 건드리지 않음(NLB→파드 인바운드는 pods_from_nlb 규칙으로 수동 관리).
 resource "kubernetes_manifest" "nlb_binding" {
-  for_each = var.enable_nlb_binding ? module.nlb.service_targets : {}
+  for_each = var.enable_nlb_binding ? module.api.service_targets : {}
 
   manifest = {
     apiVersion = "elbv2.k8s.aws/v1beta1"
