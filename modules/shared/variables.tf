@@ -1,0 +1,103 @@
+# ================== 공통 ==================
+variable "project_name" {
+  type = string
+}
+
+variable "environment" {
+  type = string
+}
+
+# ================== cloudwatch (관측성 대상) ==================
+variable "alarm_email" {
+  description = "알람 통지 수신 이메일(빈 값이면 SNS 구독 미생성)"
+  type        = string
+  default     = ""
+}
+
+variable "rds_instance_ids" {
+  type    = list(string)
+  default = []
+}
+
+variable "lambda_function_names" {
+  type    = list(string)
+  default = []
+}
+
+variable "cloudfront_distribution_id" {
+  type    = string
+  default = ""
+}
+
+variable "elasticache_cluster_ids" {
+  type    = list(string)
+  default = []
+}
+
+variable "sqs_queue_names" {
+  type    = list(string)
+  default = []
+}
+
+variable "eks_cluster_name" {
+  description = "EKS 노드 알람 대상('' 이면 미생성)"
+  type        = string
+  default     = ""
+}
+
+variable "api_gateway_name" {
+  description = "API GW 알람 대상('' 이면 미생성)"
+  type        = string
+  default     = ""
+}
+
+# ================== 교차 SG 규칙 ==================
+variable "secretsmanager_endpoint_security_group_id" {
+  description = "SM 인터페이스 엔드포인트 SG(인바운드 443 부여 대상)"
+  type        = string
+}
+
+variable "lambda_sg_id" {
+  description = "SM 엔드포인트 인바운드 소스(lambda SG)"
+  type        = string
+}
+
+variable "cluster_security_group_id" {
+  description = "NLB→파드 인바운드 부여 대상(클러스터 SG)"
+  type        = string
+}
+
+variable "nlb_sg_id" {
+  description = "파드 인바운드 소스(NLB SG)"
+  type        = string
+}
+
+variable "ticketing_http_port" {
+  description = "ticketing 파드 수신 포트(NLB→파드, nlb_binding serviceRef)"
+  type        = number
+}
+
+# ================== nlb_binding (NLB 타겟그룹 ↔ 파드) ==================
+variable "enable_nlb_binding" {
+  description = "TargetGroupBinding 생성 게이트 — clean-room plan 회피(컨트롤러 설치 후 활성화)"
+  type        = bool
+  default     = false
+}
+
+variable "service_targets" {
+  description = "서비스별 NLB 타겟그룹 — { <svc> = { target_group_arn } } (api 레이어 출력)"
+  type        = any
+  default     = {}
+}
+
+variable "ticketing_namespace" {
+  description = "ticketing 워크로드 네임스페이스(cluster 레이어 출력)"
+  type        = string
+  default     = ""
+}
+
+variable "ticketing_http_service_names" {
+  description = "서비스별 k8s Service 이름(cluster 레이어 출력)"
+  type        = map(string)
+  default     = {}
+}

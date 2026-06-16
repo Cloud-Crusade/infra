@@ -87,18 +87,6 @@ module "network" {
   enable_secretsmanager_endpoint = true
 }
 
-
-# SM 엔드포인트 인바운드(443) — 실제 SM 접근이 필요한 lambda SG 만 허용(최소권한, 모듈 순환 회피)
-resource "aws_security_group_rule" "sm_endpoint_from_lambda" {
-  type                     = "ingress"
-  security_group_id        = module.network.secretsmanager_endpoint_security_group_id
-  source_security_group_id = module.security_groups.lambda_sg_id
-  from_port                = 443
-  to_port                  = 443
-  protocol                 = "tcp"
-  description              = "SM endpoint inbound from lambda SG"
-}
-
 module "security_groups" {
   source            = "../../modules/security_group"
   project_name      = var.project_name
@@ -262,15 +250,15 @@ module "api" {
   cloudfront_zone_id     = var.cloudfront_zone_id
 }
 
-
-module "cloudwatch" {
-  source = "../../modules/cloudwatch"
+# 공유/교차 레이어 — 관측성(cloudwatch) + 교차 SG 규칙 + NLB↔파드 바인딩.
+# 모든 도메인 출력을 소비(도메인 → shared 단방향)하므로 마지막에 적용 → 순환 없음.
+module "shared" {
+  source = "../../modules/shared"
 
   project_name = var.project_name
   environment  = var.environment
   alarm_email  = var.alarm_email
 
-  # RDS
   rds_instance_ids = [
     "${var.project_name}-${var.environment}-primary",
     "${var.project_name}-${var.environment}-primary-replica",
@@ -278,42 +266,49 @@ module "cloudwatch" {
     "${var.project_name}-${var.environment}-reservation-replica",
     "${var.project_name}-${var.environment}-reservation-replica-2",
   ]
-
-  # Lambda
   lambda_function_names = [
     module.async.function_names["authorizer"],
     module.async.function_names["ticketing"],
     module.async.function_names["persistence"],
   ]
-
-  # CloudFront
   cloudfront_distribution_id = module.frontend.cloudfront_distribution_id
-
-  # ElastiCache
   elasticache_cluster_ids = [
     module.data.main_cache_cluster_id,
     module.data.waiting_room_cache_cluster_id,
   ]
-
-  # SQS
   sqs_queue_names = [module.async.queue_name]
-
-  # EKS (틀만 — 모듈 연결 후 활성화)
+  # EKS/APIGW 알람은 미활성 유지(활성화 = 리소스 추가 → 별도 PR)
   eks_cluster_name = ""
-
-  # API Gateway (틀만 — 모듈 연결 후 활성화)
   api_gateway_name = ""
+
+  secretsmanager_endpoint_security_group_id = module.network.secretsmanager_endpoint_security_group_id
+  lambda_sg_id                              = module.security_groups.lambda_sg_id
+  cluster_security_group_id                 = module.cluster.cluster_security_group_id
+  nlb_sg_id                                 = module.api.nlb_sg_id
+  ticketing_http_port                       = var.ticketing_http_port
+
+  enable_nlb_binding           = var.enable_nlb_binding
+  service_targets              = module.api.service_targets
+  ticketing_namespace          = module.cluster.ticketing_namespace
+  ticketing_http_service_names = module.cluster.ticketing_http_service_names
 }
 
-# NLB(ip 타겟) → 파드 수신 포트 — 클러스터 SG(관리형 노드그룹·파드 ENI)에 인바운드 허용
-resource "aws_security_group_rule" "pods_from_nlb" {
-  type                     = "ingress"
-  security_group_id        = module.cluster.cluster_security_group_id
-  source_security_group_id = module.api.nlb_sg_id
-  from_port                = var.ticketing_http_port
-  to_port                  = var.ticketing_http_port
-  protocol                 = "tcp"
-  description              = "ticketing pods from NLB"
+# 레이어화 state 이동(무중단) — 물리 리소스 동일, 주소만 이동
+moved {
+  from = module.cloudwatch
+  to   = module.shared.module.cloudwatch
+}
+moved {
+  from = aws_security_group_rule.sm_endpoint_from_lambda
+  to   = module.shared.aws_security_group_rule.sm_endpoint_from_lambda
+}
+moved {
+  from = aws_security_group_rule.pods_from_nlb
+  to   = module.shared.aws_security_group_rule.pods_from_nlb
+}
+moved {
+  from = kubernetes_manifest.nlb_binding
+  to   = module.shared.kubernetes_manifest.nlb_binding
 }
 
 
