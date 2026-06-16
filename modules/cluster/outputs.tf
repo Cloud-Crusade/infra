@@ -16,9 +16,9 @@ output "cluster_security_group_id" {
 }
 
 output "ticketing_namespace" {
-  value = module.eks.ticketing_namespace
+  value = module.workloads.ticketing_namespace
 }
 
 output "ticketing_http_service_names" {
-  value = module.eks.ticketing_http_service_names
+  value = module.workloads.ticketing_http_service_names
 }

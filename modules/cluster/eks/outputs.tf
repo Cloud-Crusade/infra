@@ -33,18 +33,5 @@ output "cluster_security_group_id" {
   value       = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
 }
 
-# ===== MSA 워크로드 =====
-output "ticketing_namespace" {
-  description = "ticketing 워크로드 네임스페이스"
-  value       = kubernetes_namespace_v1.ticketing.metadata[0].name
-}
 
-output "ticketing_http_service_names" {
-  description = "서비스명 → 인클러스터 HTTP(ClusterIP) Service 이름 (NLB·내부 DNS 바인딩 대상)"
-  value       = { for k, m in module.ticketing_service : k => m.http_service_name }
-}
 
-output "ticketing_grpc_service_names" {
-  description = "서비스명 → headless gRPC Service 이름 (gRPC 보유 서비스만, 그 외 빈 문자열)"
-  value       = { for k, m in module.ticketing_service : k => m.grpc_service_name }
-}
