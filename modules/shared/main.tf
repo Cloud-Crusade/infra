@@ -50,6 +50,29 @@ resource "aws_security_group_rule" "pods_from_nlb" {
   description              = "ticketing pods from NLB"
 }
 
+# 파드 → RDS(5432) — 관리형 노드그룹 파드는 클러스터 primary SG 사용(커스텀 eks SG 아님).
+# data→rds_sg→cluster 순환 회피 위해 SG 인라인이 아닌 shared 독립 규칙으로 배치.
+resource "aws_security_group_rule" "rds_from_pods" {
+  type                     = "ingress"
+  security_group_id        = module.security_group.rds_sg_id
+  source_security_group_id = var.cluster_security_group_id
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  description              = "RDS from EKS pods (cluster primary SG)"
+}
+
+# 파드 → ElastiCache(6379) — 동일 이유(앱 파드 Redis 접속)
+resource "aws_security_group_rule" "cache_from_pods" {
+  type                     = "ingress"
+  security_group_id        = module.security_group.cache_sg_id
+  source_security_group_id = var.cluster_security_group_id
+  from_port                = 6379
+  to_port                  = 6379
+  protocol                 = "tcp"
+  description              = "ElastiCache from EKS pods (cluster primary SG)"
+}
+
 # NLB 타겟그룹(ip) ↔ 파드 IP 바인딩 — AWS LB Controller 가 ticketing-<svc> 서비스의
 # ready 엔드포인트(파드 IP)를 타겟그룹에 등록/해제. NLB ↔ EKS 워크로드 연결의 마지막 고리.
 #
