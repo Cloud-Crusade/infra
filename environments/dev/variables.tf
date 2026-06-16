@@ -281,6 +281,17 @@ variable "enable_nlb_binding" {
   default     = false
 }
 
+# API GW 백엔드 선택 — eks(NLB→파드) | test_ec2(단일 nginx 게이트웨이, 디버깅·부하테스트)
+variable "api_backend" {
+  description = "API Gateway 백엔드: eks | test_ec2"
+  type        = string
+  default     = "eks"
+  validation {
+    condition     = contains(["eks", "test_ec2"], var.api_backend)
+    error_message = "api_backend 는 'eks' 또는 'test_ec2' 여야 합니다."
+  }
+}
+
 # ticketing 서비스 수신 포트 단일 소스 — NLB 타겟그룹 port·파드 SG 인바운드·TargetGroupBinding serviceRef 가 공유.
 # eks 서비스 모듈 http_port(기본 8000)와 일치해야 함.
 variable "ticketing_http_port" {

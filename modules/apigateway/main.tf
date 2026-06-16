@@ -11,16 +11,26 @@ resource "aws_api_gateway_rest_api" "this" {
   }
 }
 
-# VPC Link — REST API → internal NLB 사설 연결(REST API VPC Link 는 NLB 만 지원)
+# VPC Link — REST API → internal NLB 사설 연결(REST API VPC Link 는 NLB 만 지원). eks 백엔드일 때만 생성
 resource "aws_api_gateway_vpc_link" "this" {
+  count       = local.use_eks ? 1 : 0
   name        = "${local.name}-vpc-link"
   target_arns = [var.nlb_arn]
 }
 
 locals {
+  # 백엔드 선택: eks(NLB VPC Link, 서비스별 포트) | test_ec2(단일 nginx 게이트웨이, INTERNET)
+  use_eks   = var.backend == "eks"
+  conn_type = local.use_eks ? "VPC_LINK" : "INTERNET"
+  # vpc_link 는 eks 일 때만 1개 → one() 으로 id 추출(test_ec2 면 0개 → null=connection_id 생략). count=0 시 this[0] 인덱스 에러 회피
+  conn_id = one(aws_api_gateway_vpc_link.this[*].id)
+  # 서비스명 → 통합 base url. test_ec2 는 nginx 게이트웨이가 경로별 라우팅하므로 전 서비스 동일 host:port
+  svc_base = {
+    for k, v in var.services : k => local.use_eks ? "http://${var.nlb_dns_name}:${v.listener_port}" : var.test_backend_url
+  }
+
   # 예약은 토큰 게이트 때문에 명시 라우트로 처리 → 제네릭 프록시 대상에서 제외
-  reservation_port = var.services["reservation"].listener_port
-  proxy_services   = { for k, v in var.services : k => v if k != "reservation" }
+  proxy_services = { for k, v in var.services : k => v if k != "reservation" }
 }
 
 # 예약 토큰(Reservation) RS256 서명 검증 Lambda authorizer
@@ -74,9 +84,9 @@ resource "aws_api_gateway_integration" "reservations_post" {
   http_method             = aws_api_gateway_method.reservations_post.http_method
   type                    = "HTTP_PROXY"
   integration_http_method = "POST"
-  connection_type         = "VPC_LINK"
-  connection_id           = aws_api_gateway_vpc_link.this.id
-  uri                     = "http://${var.nlb_dns_name}:${local.reservation_port}/reservations"
+  connection_type         = local.conn_type
+  connection_id           = local.conn_id
+  uri                     = "${local.svc_base["reservation"]}/reservations"
 }
 
 # GET 목록 — 확인은 access 토큰만(입장 토큰 불필요)
@@ -93,9 +103,9 @@ resource "aws_api_gateway_integration" "reservations_get" {
   http_method             = aws_api_gateway_method.reservations_get.http_method
   type                    = "HTTP_PROXY"
   integration_http_method = "GET"
-  connection_type         = "VPC_LINK"
-  connection_id           = aws_api_gateway_vpc_link.this.id
-  uri                     = "http://${var.nlb_dns_name}:${local.reservation_port}/reservations"
+  connection_type         = local.conn_type
+  connection_id           = local.conn_id
+  uri                     = "${local.svc_base["reservation"]}/reservations"
 }
 
 # ===== /reservations/{reservation_id} — 확인(GET)·취소(DELETE): access 토큰만 =====
@@ -123,9 +133,9 @@ resource "aws_api_gateway_integration" "reservation_item" {
   http_method             = each.value.http_method
   type                    = "HTTP_PROXY"
   integration_http_method = each.value.http_method
-  connection_type         = "VPC_LINK"
-  connection_id           = aws_api_gateway_vpc_link.this.id
-  uri                     = "http://${var.nlb_dns_name}:${local.reservation_port}/reservations/{reservation_id}"
+  connection_type         = local.conn_type
+  connection_id           = local.conn_id
+  uri                     = "${local.svc_base["reservation"]}/reservations/{reservation_id}"
   request_parameters = {
     "integration.request.path.reservation_id" = "method.request.path.reservation_id"
   }
@@ -294,9 +304,9 @@ resource "aws_api_gateway_integration" "svc_root" {
   http_method             = aws_api_gateway_method.svc_root[each.key].http_method
   type                    = "HTTP_PROXY"
   integration_http_method = "ANY"
-  connection_type         = "VPC_LINK"
-  connection_id           = aws_api_gateway_vpc_link.this.id
-  uri                     = "http://${var.nlb_dns_name}:${each.value.listener_port}/${each.value.path}"
+  connection_type         = local.conn_type
+  connection_id           = local.conn_id
+  uri                     = "${local.svc_base[each.key]}/${each.value.path}"
 }
 
 resource "aws_api_gateway_method" "svc_proxy" {
@@ -315,9 +325,9 @@ resource "aws_api_gateway_integration" "svc_proxy" {
   http_method             = aws_api_gateway_method.svc_proxy[each.key].http_method
   type                    = "HTTP_PROXY"
   integration_http_method = "ANY"
-  connection_type         = "VPC_LINK"
-  connection_id           = aws_api_gateway_vpc_link.this.id
-  uri                     = "http://${var.nlb_dns_name}:${each.value.listener_port}/${each.value.path}/{proxy}"
+  connection_type         = local.conn_type
+  connection_id           = local.conn_id
+  uri                     = "${local.svc_base[each.key]}/${each.value.path}/{proxy}"
   request_parameters = {
     "integration.request.path.proxy" = "method.request.path.proxy"
   }
@@ -341,7 +351,9 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_integration.reservations_get.id,
       aws_api_gateway_method.queue.id,
       aws_api_gateway_integration.queue.id,
-      aws_api_gateway_vpc_link.this.id,
+      local.conn_id,
+      var.backend,
+      jsonencode(local.svc_base),
       aws_api_gateway_authorizer.reservation.id,
       aws_api_gateway_gateway_response.unauthorized.id,
       aws_api_gateway_gateway_response.unauthorized.status_code,

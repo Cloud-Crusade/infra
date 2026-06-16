@@ -293,11 +293,15 @@ module "lambda" {
   }
 }
 
-# API Gateway — MSA 백엔드는 internal NLB(VPC Link), queue 는 ticketing 람다
+# API Gateway — 백엔드(EKS NLB ↔ test-EC2)는 var.api_backend 로 선택, queue 는 ticketing 람다
 module "apigateway" {
   source       = "../../modules/apigateway"
   project_name = var.project_name
   environment  = var.environment
+
+  # 백엔드 선택 — eks(NLB VPC Link) | test_ec2(단일 nginx 게이트웨이)
+  backend          = var.api_backend
+  test_backend_url = "http://${aws_instance.test_service.public_dns}:${var.test_service_port}"
 
   # 경로 프리픽스(/auth,/events,/reservations,/payments) → NLB 리스너 포트(VPC Link)
   # path 는 백엔드 FastAPI 라우터 prefix 와 일치(event→/events, payment→/payments)
