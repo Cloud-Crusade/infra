@@ -45,7 +45,7 @@ variable "ecr_registry" {
   type        = string
 }
 
-# ----- data 레이어 엔드포인트(ExternalName 타깃, host:port) -----
+# ================== data 레이어 엔드포인트(ExternalName 타깃, host:port) ==================
 variable "rds_core_writer_endpoint" {
   type = string
 }
@@ -66,7 +66,7 @@ variable "redis_main_endpoint" {
   type = string
 }
 
-# ----- async 레이어(예약 큐) -----
+# ================== async 레이어(예약 큐) ==================
 variable "sqs_queue_url" {
   type = string
 }
@@ -76,7 +76,7 @@ variable "sqs_queue_arn" {
   type        = string
 }
 
-# ----- 공유 시크릿(검증측과 공유) -----
+# ================== 공유 시크릿(검증측과 공유) ==================
 variable "jwt_secret" {
   type      = string
   sensitive = true
@@ -87,7 +87,7 @@ variable "captcha_hmac_secret" {
   sensitive = true
 }
 
-# ----- DB 마스터 크리덴셜(서비스별 롤 부트스트랩) -----
+# ================== DB 마스터 크리덴셜(서비스별 롤 부트스트랩) ==================
 variable "db_name" {
   type = string
 }
