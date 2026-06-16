@@ -27,8 +27,8 @@ resource "local_file" "bastion_private_key" {
 resource "aws_instance" "bastion" {
   ami                         = data.aws_ami.amazon_linux.id
   instance_type               = var.bastion_instance_type
-  subnet_id                   = module.network.public_subnet_ids[0]
-  vpc_security_group_ids      = [module.security_groups.bastion_sg_id]
+  subnet_id                   = var.public_subnet_ids[0]
+  vpc_security_group_ids      = [var.bastion_sg_id]
   key_name                    = aws_key_pair.bastion.key_name
   associate_public_ip_address = true
 

@@ -323,7 +323,7 @@ module "api" {
   ticketing_http_port = var.ticketing_http_port
 
   api_backend      = var.api_backend
-  test_backend_url = "http://${aws_instance.test_service.public_dns}:${var.test_service_port}"
+  test_backend_url = "http://${module.ops.test_service_public_dns}:${var.test_service_port}"
 
   lambda_invoke_arns    = module.async.invoke_arns
   lambda_function_names = module.async.function_names
@@ -400,3 +400,90 @@ resource "aws_security_group_rule" "pods_from_nlb" {
   description              = "ticketing pods from NLB"
 }
 
+
+# 운영/테스트 픽스처 — bastion(SSH·grafana) + test_ec2(디버그 백엔드)
+module "ops" {
+  source = "../../modules/ops"
+
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = var.aws_region
+
+  public_subnet_ids = module.network.public_subnet_ids
+  vpc_id            = module.network.vpc_id
+  bastion_sg_id     = module.security_groups.bastion_sg_id
+  eks_sg_id         = module.security_groups.eks_sg_id
+  allowed_ssh_cidrs = var.allowed_ssh_cidrs
+
+  bastion_instance_type = var.bastion_instance_type
+
+  rds_primary_endpoint             = module.data.primary_endpoint
+  rds_primary_replica_endpoint     = module.data.primary_replica_endpoint
+  rds_reservation_endpoint         = module.data.reservation_endpoint
+  rds_reservation_replica_endpoint = module.data.reservation_replica_endpoint
+  redis_main_endpoint              = module.data.main_cache_endpoint
+
+  sqs_queue_url = module.async.queue_url
+  sqs_queue_arn = module.async.queue_arn
+
+  jwt_secret          = random_password.authorization.result
+  captcha_hmac_secret = random_password.captcha_hmac.result
+  captcha_enabled     = var.captcha_enabled
+
+  db_name     = var.db_name
+  db_username = var.db_username
+  db_password = var.db_password
+
+  test_image_registry        = var.test_image_registry
+  ecr_namespace              = var.ecr_namespace
+  test_image_tag             = var.test_image_tag
+  test_service_port          = var.test_service_port
+  test_ec2_instance_type     = var.test_ec2_instance_type
+  test_ec2_root_volume_gb    = var.test_ec2_root_volume_gb
+  test_service_ingress_cidrs = var.test_service_ingress_cidrs
+}
+
+moved {
+  from = aws_instance.bastion
+  to   = module.ops.aws_instance.bastion
+}
+moved {
+  from = tls_private_key.bastion
+  to   = module.ops.tls_private_key.bastion
+}
+moved {
+  from = aws_key_pair.bastion
+  to   = module.ops.aws_key_pair.bastion
+}
+moved {
+  from = local_file.bastion_private_key
+  to   = module.ops.local_file.bastion_private_key
+}
+moved {
+  from = aws_s3_object.bastion_private_key
+  to   = module.ops.aws_s3_object.bastion_private_key
+}
+moved {
+  from = aws_iam_role.test_ec2
+  to   = module.ops.aws_iam_role.test_ec2
+}
+moved {
+  from = aws_iam_role_policy_attachment.test_ec2_ecr
+  to   = module.ops.aws_iam_role_policy_attachment.test_ec2_ecr
+}
+moved {
+  from = aws_iam_role_policy.test_ec2_sqs
+  to   = module.ops.aws_iam_role_policy.test_ec2_sqs
+}
+moved {
+  from = aws_iam_instance_profile.test_ec2
+  to   = module.ops.aws_iam_instance_profile.test_ec2
+}
+moved {
+  from = aws_security_group.test_ec2
+  to   = module.ops.aws_security_group.test_ec2
+}
+moved {
+  from = aws_instance.test_service
+  to   = module.ops.aws_instance.test_service
+}
