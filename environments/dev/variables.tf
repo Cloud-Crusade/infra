@@ -178,6 +178,7 @@ variable "captcha_enabled" {
   default     = false
 }
 
+<<<<<<< HEAD
 
 # ============================================================
 # EKS
@@ -288,3 +289,13 @@ variable "ticketing_http_port" {
   type        = number
   default     = 8000
 }
+=======
+# ==== ARC =====
+variable "lb_arn_suffix" {
+  type = string
+}
+
+variable "target_group_arn_suffix" {
+  type = string
+}
+>>>>>>> eab5759 ([FEAT]: CloudWatch 모듈 기능 연결)

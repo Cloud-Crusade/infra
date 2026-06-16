@@ -73,3 +73,13 @@ variable "api_gateway_name" {
   type        = string
   default     = ""
 }
+
+variable "lb_arn_suffix" {
+  description = "NLB ARN suffix for CloudWatch dimensions"
+  type        = string
+}
+
+variable "target_group_arn_suffix" {
+  description = "Target group ARN suffix for CloudWatch dimensions"
+  type        = string
+}

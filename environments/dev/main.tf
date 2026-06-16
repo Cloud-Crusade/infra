@@ -416,6 +416,10 @@ module "cloudwatch" {
 
   # API Gateway (틀만 — 모듈 연결 후 활성화)
   api_gateway_name = ""
+
+  # ARC
+  lb_arn_suffix = var.lb_arn_suffix
+  target_group_arn_suffix = var.target_group_arn_suffix
 }
 
 module "nlb" {
