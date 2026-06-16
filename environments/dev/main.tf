@@ -87,15 +87,6 @@ module "network" {
   enable_secretsmanager_endpoint = true
 }
 
-module "security_groups" {
-  source            = "../../modules/security_group"
-  project_name      = var.project_name
-  environment       = var.environment
-  vpc_id            = module.network.vpc_id
-  vpc_cidr          = module.network.vpc_cidr
-  allowed_ssh_cidrs = var.allowed_ssh_cidrs
-}
-
 module "cluster" {
   source = "../../modules/cluster"
 
@@ -105,7 +96,7 @@ module "cluster" {
   vpc_id       = module.network.vpc_id
 
   subnet_ids = module.network.private_subnet_ids
-  eks_sg_id  = module.security_groups.eks_sg_id
+  eks_sg_id  = module.shared.eks_sg_id
 
   cluster_version                      = var.eks_cluster_version
   cluster_endpoint_public_access       = var.eks_endpoint_public_access
@@ -156,8 +147,8 @@ module "data" {
   environment        = var.environment
   subnet_ids         = module.network.private_subnet_ids
   availability_zones = var.availability_zones
-  rds_sg_id          = module.security_groups.rds_sg_id
-  cache_sg_id        = module.security_groups.cache_sg_id
+  rds_sg_id          = module.shared.rds_sg_id
+  cache_sg_id        = module.shared.cache_sg_id
 
   db_name              = var.db_name
   db_username          = var.db_username
@@ -195,7 +186,7 @@ module "async" {
   project_name = var.project_name
   environment  = var.environment
 
-  lambda_sg_id                = module.security_groups.lambda_sg_id
+  lambda_sg_id                = module.shared.lambda_sg_id
   vpc_subnet_ids              = module.network.private_subnet_ids
   secrets_extension_layer_arn = var.secrets_extension_layer_arn
 
@@ -246,6 +237,11 @@ module "shared" {
   environment  = var.environment
   alarm_email  = var.alarm_email
 
+  # SG 객체 생성 입력(network 만 의존) — 도메인이 module.shared.*_sg_id 로 소비
+  vpc_id            = module.network.vpc_id
+  vpc_cidr          = module.network.vpc_cidr
+  allowed_ssh_cidrs = var.allowed_ssh_cidrs
+
   rds_instance_ids = [
     "${var.project_name}-${var.environment}-primary",
     "${var.project_name}-${var.environment}-primary-replica",
@@ -269,7 +265,6 @@ module "shared" {
   api_gateway_name = ""
 
   secretsmanager_endpoint_security_group_id = module.network.secretsmanager_endpoint_security_group_id
-  lambda_sg_id                              = module.security_groups.lambda_sg_id
   cluster_security_group_id                 = module.cluster.cluster_security_group_id
   nlb_sg_id                                 = module.api.nlb_sg_id
   ticketing_http_port                       = var.ticketing_http_port
@@ -309,8 +304,8 @@ module "ops" {
 
   public_subnet_ids = module.network.public_subnet_ids
   vpc_id            = module.network.vpc_id
-  bastion_sg_id     = module.security_groups.bastion_sg_id
-  eks_sg_id         = module.security_groups.eks_sg_id
+  bastion_sg_id     = module.shared.bastion_sg_id
+  eks_sg_id         = module.shared.eks_sg_id
   allowed_ssh_cidrs = var.allowed_ssh_cidrs
 
   bastion_instance_type = var.bastion_instance_type
@@ -341,3 +336,8 @@ module "ops" {
   test_service_ingress_cidrs = var.test_service_ingress_cidrs
 }
 
+# security_group 을 shared 레이어로 편입 — 물리 SG 동일, 주소만 이동
+moved {
+  from = module.security_groups
+  to   = module.shared.module.security_group
+}

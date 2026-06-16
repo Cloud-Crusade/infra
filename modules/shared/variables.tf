@@ -51,14 +51,23 @@ variable "api_gateway_name" {
   default     = ""
 }
 
+# ================== SG 객체(security_group 서브모듈 입력) ==================
+variable "vpc_id" {
+  type = string
+}
+
+variable "vpc_cidr" {
+  type = string
+}
+
+variable "allowed_ssh_cidrs" {
+  description = "bastion SSH 허용 IP"
+  type        = list(string)
+}
+
 # ================== 교차 SG 규칙 ==================
 variable "secretsmanager_endpoint_security_group_id" {
   description = "SM 인터페이스 엔드포인트 SG(인바운드 443 부여 대상)"
-  type        = string
-}
-
-variable "lambda_sg_id" {
-  description = "SM 엔드포인트 인바운드 소스(lambda SG)"
   type        = string
 }
 
