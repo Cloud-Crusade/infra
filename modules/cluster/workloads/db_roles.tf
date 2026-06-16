@@ -7,9 +7,9 @@ locals {
     payment     = { writer = "rds-reservation-writer", reader = "rds-reservation-reader", role = "payment_svc" }
   }
 
-  # 서비스명 → 전체 이미지 레퍼런스. 리포지토리(ticketing-<svc>)는 terraform 밖에서 선행 생성,
+  # 서비스명 → 전체 이미지 레퍼런스. 리포지토리(<namespace>/<svc>)는 terraform 밖에서 선행 생성,
   # 이후 롤아웃은 cc/app CD(kubectl set image) 소유 → workload 의 image 는 ignore_changes
-  ticketing_images = { for k in keys(local.svc_db) : k => "${var.ecr_registry}/ticketing-${k}:${var.ticketing_image_tag}" }
+  ticketing_images = { for k in keys(local.svc_db) : k => "${var.ecr_registry}/${var.ecr_namespace}/${k}:${var.ticketing_image_tag}" }
 }
 
 # asyncpg URL 파싱 안정성 위해 special=false

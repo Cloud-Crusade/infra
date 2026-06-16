@@ -42,6 +42,7 @@ module "workloads" {
   domain_name         = var.domain_name
   captcha_enabled     = var.captcha_enabled
   ticketing_image_tag = var.ticketing_image_tag
+  ecr_namespace       = var.ecr_namespace
   ecr_registry        = var.ecr_registry
 
   rds_core_writer_endpoint        = var.rds_core_writer_endpoint

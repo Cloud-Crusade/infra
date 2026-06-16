@@ -40,6 +40,11 @@ variable "ticketing_image_tag" {
   default     = "latest"
 }
 
+variable "ecr_namespace" {
+  description = "ECR 리포지토리 네임스페이스 prefix (이미지 경로 <registry>/<namespace>/<svc>). cc/app CD 와 동일"
+  type        = string
+}
+
 variable "ecr_registry" {
   description = "ECR 레지스트리 호스트. 리포지토리(ticketing-<svc>)는 terraform 밖에서 선행 생성"
   type        = string

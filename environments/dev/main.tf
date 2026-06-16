@@ -120,8 +120,9 @@ module "cluster" {
   domain_name         = var.domain_name
   captcha_enabled     = var.captcha_enabled
   ticketing_image_tag = var.ticketing_image_tag
-  # 리포지토리(ticketing-<svc>)는 terraform 밖에서 선행 생성 → 레지스트리 호스트만 전달
-  ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+  # 리포지토리(<namespace>/<svc>)는 terraform 밖에서 선행 생성 → 레지스트리 호스트·네임스페이스 전달
+  ecr_namespace = var.ecr_namespace
+  ecr_registry  = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 
   rds_core_writer_endpoint        = module.data.primary_endpoint
   rds_core_reader_endpoint        = module.data.primary_replica_endpoint
@@ -238,9 +239,10 @@ module "shared" {
   alarm_email  = var.alarm_email
 
   # SG 객체 생성 입력(network 만 의존) — 도메인이 module.shared.*_sg_id 로 소비
-  vpc_id            = module.network.vpc_id
-  vpc_cidr          = module.network.vpc_cidr
-  allowed_ssh_cidrs = var.allowed_ssh_cidrs
+  vpc_id               = module.network.vpc_id
+  vpc_cidr             = module.network.vpc_cidr
+  private_subnet_cidrs = var.private_subnet_cidrs
+  allowed_ssh_cidrs    = var.allowed_ssh_cidrs
 
   rds_instance_ids = [
     "${var.project_name}-${var.environment}-primary",

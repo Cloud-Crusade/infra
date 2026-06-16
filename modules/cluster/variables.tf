@@ -109,6 +109,10 @@ variable "ticketing_image_tag" {
   type = string
 }
 
+variable "ecr_namespace" {
+  type = string
+}
+
 variable "ecr_registry" {
   type = string
 }

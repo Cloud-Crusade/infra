@@ -21,11 +21,12 @@ module "cloudwatch" {
 module "security_group" {
   source = "./security_group"
 
-  project_name      = var.project_name
-  environment       = var.environment
-  vpc_id            = var.vpc_id
-  vpc_cidr          = var.vpc_cidr
-  allowed_ssh_cidrs = var.allowed_ssh_cidrs
+  project_name         = var.project_name
+  environment          = var.environment
+  vpc_id               = var.vpc_id
+  vpc_cidr             = var.vpc_cidr
+  private_subnet_cidrs = var.private_subnet_cidrs
+  allowed_ssh_cidrs    = var.allowed_ssh_cidrs
 }
 
 # SM 엔드포인트 인바운드(443) — 실제 SM 접근이 필요한 lambda SG 만 허용(최소권한, 모듈 순환 회피)
@@ -48,29 +49,6 @@ resource "aws_security_group_rule" "pods_from_nlb" {
   to_port                  = var.ticketing_http_port
   protocol                 = "tcp"
   description              = "ticketing pods from NLB"
-}
-
-# 파드 → RDS(5432) — 관리형 노드그룹 파드는 클러스터 primary SG 사용(커스텀 eks SG 아님).
-# data→rds_sg→cluster 순환 회피 위해 SG 인라인이 아닌 shared 독립 규칙으로 배치.
-resource "aws_security_group_rule" "rds_from_pods" {
-  type                     = "ingress"
-  security_group_id        = module.security_group.rds_sg_id
-  source_security_group_id = var.cluster_security_group_id
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  description              = "RDS from EKS pods (cluster primary SG)"
-}
-
-# 파드 → ElastiCache(6379) — 동일 이유(앱 파드 Redis 접속)
-resource "aws_security_group_rule" "cache_from_pods" {
-  type                     = "ingress"
-  security_group_id        = module.security_group.cache_sg_id
-  source_security_group_id = var.cluster_security_group_id
-  from_port                = 6379
-  to_port                  = 6379
-  protocol                 = "tcp"
-  description              = "ElastiCache from EKS pods (cluster primary SG)"
 }
 
 # NLB 타겟그룹(ip) ↔ 파드 IP 바인딩 — AWS LB Controller 가 ticketing-<svc> 서비스의
