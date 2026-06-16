@@ -84,6 +84,8 @@ resource "helm_release" "this" {
   values = [yamlencode({
     autoDiscovery = { clusterName = var.cluster_name }
     awsRegion     = var.region
+    # 노드그룹 dedicated taint(system·app) 통과
+    tolerations = [{ key = "dedicated", operator = "Exists", effect = "NoSchedule" }]
     rbac = {
       serviceAccount = {
         name        = var.service_account_name

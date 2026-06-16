@@ -6,4 +6,9 @@ resource "helm_release" "this" {
   chart      = "metrics-server"
   version    = var.chart_version
   namespace  = var.namespace
+
+  # 노드그룹 dedicated taint(system·app) 통과
+  values = [yamlencode({
+    tolerations = [{ key = "dedicated", operator = "Exists", effect = "NoSchedule" }]
+  })]
 }
