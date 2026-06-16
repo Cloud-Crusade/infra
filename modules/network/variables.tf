@@ -1,3 +1,4 @@
+# ================== 공통 ==================
 variable "project_name" {
   type = string
 }
@@ -6,6 +7,7 @@ variable "environment" {
   type = string
 }
 
+# ================== vpc ==================
 variable "vpc_cidr" {
   type = string
 }
