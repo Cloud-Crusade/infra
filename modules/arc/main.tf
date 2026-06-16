@@ -1,6 +1,3 @@
-data "aws_region" "current" {}
-
-data "aws_caller_identity" "current" {}
 
 resource "aws_arczonalshift_zonal_autoshift_configuration" "this" {
     resource_arn = var.lb_arn
