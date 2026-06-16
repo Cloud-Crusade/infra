@@ -17,11 +17,22 @@ module "cloudwatch" {
   api_gateway_name = var.api_gateway_name
 }
 
+# 도메인 SG 객체 — eks/rds/cache/lambda/bastion. network 에만 의존(도메인 출력 비참조) → 도메인이 선행 소비
+module "security_group" {
+  source = "./security_group"
+
+  project_name      = var.project_name
+  environment       = var.environment
+  vpc_id            = var.vpc_id
+  vpc_cidr          = var.vpc_cidr
+  allowed_ssh_cidrs = var.allowed_ssh_cidrs
+}
+
 # SM 엔드포인트 인바운드(443) — 실제 SM 접근이 필요한 lambda SG 만 허용(최소권한, 모듈 순환 회피)
 resource "aws_security_group_rule" "sm_endpoint_from_lambda" {
   type                     = "ingress"
   security_group_id        = var.secretsmanager_endpoint_security_group_id
-  source_security_group_id = var.lambda_sg_id
+  source_security_group_id = module.security_group.lambda_sg_id
   from_port                = 443
   to_port                  = 443
   protocol                 = "tcp"
