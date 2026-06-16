@@ -110,7 +110,7 @@ resource "aws_iam_instance_profile" "test_ec2" {
 resource "aws_security_group" "test_ec2" {
   name        = "${var.project_name}-${var.environment}-test-ec2-sg"
   description = "Test EC2 running ECR service image"
-  vpc_id      = module.vpc.vpc_id
+  vpc_id      = module.network.vpc_id
 
   # nginx 게이트웨이(8000) + 서비스 직접 디버깅 포트(8001-8004)
   ingress {
@@ -144,7 +144,7 @@ resource "aws_security_group" "test_ec2" {
 resource "aws_instance" "test_service" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = var.test_ec2_instance_type
-  subnet_id                   = module.vpc.public_subnet_ids[0]
+  subnet_id                   = module.network.public_subnet_ids[0]
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.test_ec2.id, module.security_groups.eks_sg_id]
   iam_instance_profile        = aws_iam_instance_profile.test_ec2.name
