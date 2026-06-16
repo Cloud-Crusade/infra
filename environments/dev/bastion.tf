@@ -37,8 +37,8 @@ resource "aws_instance" "bastion" {
   }
 
   user_data = <<-EOF
-                # docker compsoe 설치
                 #!/bin/bash
+                # docker compsoe 설치
                 mkdir -p /usr/libexec/docker/cli-plugins/
                 curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
                 chmod +x /usr/libexec/docker/cli-plugins/docker-compose
