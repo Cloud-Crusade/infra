@@ -8,6 +8,23 @@ variable "environment" {
   type        = string
 }
 
+# 백엔드 선택 — eks(NLB VPC Link) | test_ec2(단일 nginx 게이트웨이, 디버깅·부하테스트용)
+variable "backend" {
+  description = "API GW 백엔드: eks | test_ec2"
+  type        = string
+  default     = "eks"
+  validation {
+    condition     = contains(["eks", "test_ec2"], var.backend)
+    error_message = "backend 는 'eks' 또는 'test_ec2' 여야 합니다."
+  }
+}
+
+variable "test_backend_url" {
+  description = "test_ec2 백엔드 base URL (예: http://<dns>:<port>). eks 면 무시"
+  type        = string
+  default     = ""
+}
+
 # MSA 백엔드는 internal NLB 를 VPC Link 로 사설 연결(REST API VPC Link 는 NLB 만 지원)
 variable "nlb_arn" {
   description = "VPC Link 대상 internal NLB ARN"
