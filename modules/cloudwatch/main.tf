@@ -426,3 +426,31 @@ resource "aws_cloudwatch_dashboard" "main" {
     ]
   })
 }
+
+resource "aws_cloudwatch_metric_alarm" "arc_zonal_shift" {
+  alarm_name          = "arc-zonal-shift-alarm"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+
+  metric_query {
+    id          = "unhealthy_hosts"
+    return_data = true
+
+    metric {
+      metric_name = "UnHealthyHostCount"
+      namespace   = "AWS/NetworkELB"
+      period      = 60
+      stat        = "Maximum"
+
+      dimensions = {
+        LoadBalancer = var.lb_arn_suffix
+        TargetGroup  = var.target_group_arn_suffix
+      }
+    }
+  }
+
+  alarm_description = "ARC Zonal Shift outcome alarm for unhealthy hosts"
+  actions_enabled   = false
+}
