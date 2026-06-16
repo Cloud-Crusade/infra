@@ -12,18 +12,18 @@ resource "kubernetes_manifest" "nlb_binding" {
     kind       = "TargetGroupBinding"
     metadata = {
       name      = "ticketing-${each.key}"
-      namespace = module.eks.ticketing_namespace
+      namespace = module.cluster.ticketing_namespace
     }
     spec = {
       targetGroupARN = each.value.target_group_arn
       targetType     = "ip"
       serviceRef = {
-        name = module.eks.ticketing_http_service_names[each.key]
+        name = module.cluster.ticketing_http_service_names[each.key]
         port = var.ticketing_http_port
       }
     }
   }
 
-  # CRD(TargetGroupBinding)는 LB Controller(#133)가 설치 → 활성화 시 컨트롤러 이후 순서 보장
-  depends_on = [module.aws_lb_controller]
+  # CRD(TargetGroupBinding)는 cluster 의 LB Controller 가 설치 → 활성화 시 그 이후 순서 보장
+  depends_on = [module.cluster]
 }

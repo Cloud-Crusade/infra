@@ -53,23 +53,23 @@ provider "aws" {
 
 provider "helm" {
   kubernetes = {
-    host                   = module.eks.cluster_endpoint
-    cluster_ca_certificate = base64decode(module.eks.cluster_ca_data)
+    host                   = module.cluster.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.cluster.cluster_ca_data)
     exec = {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
-      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+      args        = ["eks", "get-token", "--cluster-name", module.cluster.cluster_name]
     }
   }
 }
 
 provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_ca_data)
+  host                   = module.cluster.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.cluster.cluster_ca_data)
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+    args        = ["eks", "get-token", "--cluster-name", module.cluster.cluster_name]
   }
 }
 
@@ -112,73 +112,83 @@ module "security_groups" {
   allowed_ssh_cidrs = var.allowed_ssh_cidrs
 }
 
-module "eks" {
-  source = "../../modules/eks"
+module "cluster" {
+  source = "../../modules/cluster"
 
   project_name = var.project_name
   environment  = var.environment
-  subnet_ids   = module.network.private_subnet_ids
+  aws_region   = var.aws_region
+  vpc_id       = module.network.vpc_id
 
-  additional_security_group_ids = [module.security_groups.eks_sg_id]
+  subnet_ids = module.network.private_subnet_ids
+  eks_sg_id  = module.security_groups.eks_sg_id
 
-  cluster_version = var.eks_cluster_version
-
-  # TODO: 환경별 엔드포인트 접근 정책 설정
+  cluster_version                      = var.eks_cluster_version
   cluster_endpoint_public_access       = var.eks_endpoint_public_access
   cluster_endpoint_private_access      = var.eks_endpoint_private_access
   cluster_endpoint_public_access_cidrs = var.eks_endpoint_public_access_cidrs
+  cluster_enabled_log_types            = var.eks_enabled_log_types
+  access_entries                       = var.eks_access_entries
 
-  cluster_enabled_log_types = var.eks_enabled_log_types
-
-  # system 노드 그룹
   system_ng_instance_types = var.eks_system_ng_instance_types
   system_ng_capacity_type  = var.eks_system_ng_capacity_type
   system_ng_desired_size   = var.eks_system_ng_desired_size
   system_ng_min_size       = var.eks_system_ng_min_size
   system_ng_max_size       = var.eks_system_ng_max_size
 
-  # app 노드 그룹
   app_ng_instance_types = var.eks_app_ng_instance_types
   app_ng_capacity_type  = var.eks_app_ng_capacity_type
   app_ng_desired_size   = var.eks_app_ng_desired_size
   app_ng_min_size       = var.eks_app_ng_min_size
   app_ng_max_size       = var.eks_app_ng_max_size
 
-  # IAM ARN
   cluster_role_arn = module.iam.cluster_role_arn
   node_role_arn    = module.iam.ng_role_arn
   vpc_cni_role_arn = module.iam.vpc_cni_role_arn
   ebs_csi_role_arn = module.iam.ebs_csi_role_arn
 
-  access_entries = var.eks_access_entries
-
-  # ----- MSA 워크로드 배선 (Deployment·Service·HPA·SA·DB롤·마이그레이션) -----
-  aws_region          = var.aws_region
   domain_name         = var.domain_name
   captcha_enabled     = var.captcha_enabled
   ticketing_image_tag = var.ticketing_image_tag
   # 리포지토리(ticketing-<svc>)는 terraform 밖에서 선행 생성 → 레지스트리 호스트만 전달
   ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 
-  # RDS/ElastiCache 고정 DNS(ExternalName) 타깃 — 엔드포인트 컷오버 시 타깃만 갱신
   rds_core_writer_endpoint        = module.data.primary_endpoint
   rds_core_reader_endpoint        = module.data.primary_replica_endpoint
   rds_reservation_writer_endpoint = module.data.reservation_endpoint
   rds_reservation_reader_endpoint = module.data.reservation_replica_endpoint
   redis_main_endpoint             = module.data.main_cache_endpoint
 
-  # reservation IRSA(SendMessage) + ConfigMap 큐 URL
   sqs_queue_url = module.async.queue_url
   sqs_queue_arn = module.async.queue_arn
 
-  # 검증측(authorizer)과 공유하는 시크릿 — 루트가 random_password 소유
   jwt_secret          = random_password.authorization.result
   captcha_hmac_secret = random_password.captcha_hmac.result
 
-  # 서비스별 DB 롤 부트스트랩(master 크리덴셜)
   db_name     = var.db_name
   db_username = var.db_username
   db_password = var.db_password
+}
+
+moved {
+  from = module.eks
+  to   = module.cluster.module.eks
+}
+moved {
+  from = module.metrics_server
+  to   = module.cluster.module.metrics_server
+}
+moved {
+  from = module.aws_lb_controller
+  to   = module.cluster.module.aws_lb_controller
+}
+moved {
+  from = module.cluster_autoscaler
+  to   = module.cluster.module.cluster_autoscaler
+}
+moved {
+  from = module.prometheus
+  to   = module.cluster.module.prometheus
 }
 module "data" {
   source = "../../modules/data"
@@ -416,63 +426,11 @@ module "nlb" {
 # NLB(ip 타겟) → 파드 수신 포트 — 클러스터 SG(관리형 노드그룹·파드 ENI)에 인바운드 허용
 resource "aws_security_group_rule" "pods_from_nlb" {
   type                     = "ingress"
-  security_group_id        = module.eks.cluster_security_group_id
+  security_group_id        = module.cluster.cluster_security_group_id
   source_security_group_id = module.nlb.nlb_sg_id
   from_port                = var.ticketing_http_port
   to_port                  = var.ticketing_http_port
   protocol                 = "tcp"
   description              = "ticketing pods from NLB"
-}
-
-# metrics-server — HPA(eks_service)가 CPU/메모리 사용률로 스케일하도록 리소스 메트릭 제공
-module "metrics_server" {
-  source = "../../modules/metrics_server"
-
-  # provider 는 컨트롤 플레인에만 암시 의존 → 노드그룹 준비 전 helm 배포 시 파드 Pending·타임아웃.
-  # 노드 스케줄 가능해진 뒤 배포되도록 명시 의존.
-  depends_on = [module.eks]
-}
-
-# AWS Load Balancer Controller — terraform 소유 NLB 타겟그룹에 파드 IP 를 등록(TargetGroupBinding)하기 위한 컨트롤러
-module "aws_lb_controller" {
-  source = "../../modules/aws_lb_controller"
-
-  project_name = var.project_name
-  environment  = var.environment
-  cluster_name = module.eks.cluster_name
-  region       = var.aws_region
-  vpc_id       = module.network.vpc_id
-
-  oidc_provider_arn = module.eks.oidc_provider_arn
-  oidc_provider_url = module.eks.oidc_issuer_url
-
-  # 입력은 컨트롤 플레인에만 의존 → 노드 준비 후 배포되도록 명시 의존(helm wait 타임아웃 방지)
-  depends_on = [module.eks]
-}
-
-# Cluster Autoscaler — 관리형 노드그룹(system/app) ASG desired 를 자동 조정(노드 오토스케일링)
-module "cluster_autoscaler" {
-  source = "../../modules/cluster_autoscaler"
-
-  project_name = var.project_name
-  environment  = var.environment
-  cluster_name = module.eks.cluster_name
-  region       = var.aws_region
-
-  oidc_provider_arn = module.eks.oidc_provider_arn
-  oidc_provider_url = module.eks.oidc_issuer_url
-
-  # 입력은 컨트롤 플레인에만 의존 → 노드 준비 후 배포되도록 명시 의존(helm wait 타임아웃 방지)
-  depends_on = [module.eks]
-}
-
-module "prometheus" {
-  source = "../../modules/prometheus"
-
-  project_name = var.project_name
-  environment  = var.environment
-
-  # EKS (틀만 — 모듈 연결 후 활성화)
-  eks_cluster_name = ""
 }
 
