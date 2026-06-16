@@ -96,7 +96,7 @@ resource "aws_iam_role_policy" "test_ec2_sqs" {
     Statement = [{
       Effect   = "Allow"
       Action   = ["sqs:SendMessage", "sqs:GetQueueUrl", "sqs:GetQueueAttributes"]
-      Resource = module.sqs.queue_arn
+      Resource = module.async.queue_arn
     }]
   })
 }
@@ -173,7 +173,7 @@ resource "aws_instance" "test_service" {
     jwt_secret             = random_password.authorization.result
     captcha_enabled        = var.captcha_enabled
     captcha_hmac_secret    = random_password.captcha_hmac.result
-    sqs_queue_url          = module.sqs.queue_url
+    sqs_queue_url          = module.async.queue_url
   })
 
   tags = {

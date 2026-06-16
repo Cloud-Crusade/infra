@@ -168,8 +168,8 @@ module "eks" {
   redis_main_endpoint             = module.data.main_cache_endpoint
 
   # reservation IRSA(SendMessage) + ConfigMap 큐 URL
-  sqs_queue_url = module.sqs.queue_url
-  sqs_queue_arn = module.sqs.queue_arn
+  sqs_queue_url = module.async.queue_url
+  sqs_queue_arn = module.async.queue_arn
 
   # 검증측(authorizer)과 공유하는 시크릿 — 루트가 random_password 소유
   jwt_secret          = random_password.authorization.result
@@ -245,79 +245,58 @@ module "cloudfront" {
   acm_certificate_arn = module.acm_www.certificate_arn
 }
 
-# 예약 데이터 임시 큐 (서비스 produce → persistence 람다 consume)
-module "sqs" {
-  source       = "../../modules/sqs"
+# 비동기/서버리스 — lambda·sqs·eventbridge + persistence SQS→Lambda 트리거
+module "async" {
+  source = "../../modules/async"
+
   project_name = var.project_name
   environment  = var.environment
-  name         = "reservation-leaky-bucket"
+
+  lambda_role_arn             = module.iam.lambda_role_arn
+  lambda_sg_id                = module.security_groups.lambda_sg_id
+  vpc_subnet_ids              = module.network.private_subnet_ids
+  secrets_extension_layer_arn = var.secrets_extension_layer_arn
+
+  reservation_endpoint               = module.data.reservation_endpoint
+  waiting_room_cache_endpoint        = module.data.waiting_room_cache_endpoint
+  reservation_private_key_secret_arn = module.data.reservation_private_key_secret_arn
+  authorization_secret_arn           = module.data.authorization_secret_arn
+  cloudfront_domain_name             = module.cloudfront.cloudfront_domain_name
+
+  db_name     = var.db_name
+  db_username = var.db_username
+  db_password = var.db_password
 }
 
-# SQS(예약 큐) → persistence 람다 트리거
-resource "aws_lambda_event_source_mapping" "persistence_sqs" {
-  event_source_arn = module.sqs.queue_arn
-  function_name    = module.lambda.function_arns["persistence"]
+moved {
+  from = module.lambda
+  to   = module.async.module.lambda
 }
-
-# Lambda — zip/목록은 S3, 모듈별 env 주입 (값은 GitHub env→converter 수신)
-module "lambda" {
-  source          = "../../modules/lambda"
-  project_name    = var.project_name
-  environment     = var.environment
-  lambda_role_arn = module.iam.lambda_role_arn
-  artifact_bucket = "tfstate-bucket-d8f5bb8d"
-
-  # ticketing → ElastiCache, persistence → RDS (VPC 내부). authorizer 는 CloudFront 접근 위해 VPC 제외
-  vpc_modules            = ["ticketing", "persistence"]
-  vpc_subnet_ids         = module.network.private_subnet_ids
-  vpc_security_group_ids = [module.security_groups.lambda_sg_id]
-
-  lambda_env = {
-    persistence = {
-      # SQS 로 받은 예약 데이터를 reservation RDS 에 적재(psycopg2). URL 은 rds 에서 구성
-      RESERVATION_DB_URL = "postgresql://${var.db_username}:${var.db_password}@${module.data.reservation_endpoint}/${var.db_name}"
-    }
-    ticketing = {
-      REDIS_HOST = module.data.waiting_room_cache_endpoint
-      REDIS_PORT = "6379"
-      # 예약 서명키(RSA 개인키)는 값이 아닌 이름만 — 런타임에 Secrets 확장 캐시로 조회(VPC 엔드포인트 경유)
-      RESERVATION_SECRET_ID = module.data.reservation_private_key_secret_arn
-      # access token(HS256) 검증용 — 큐가 sub→user_id 추출. authorizer 와 동일 시크릿
-      AUTHORIZATION_SECRET_ID = module.data.authorization_secret_arn
-    }
-    # 예약 토큰 서명 검증 authorizer — CloudFront 로 reservation 공개키 fetch(RS256 검증)
-    # S3 직접 접근 대신 CloudFront URL → S3 IAM 불필요 + 접근 비용 절감
-    authorizer = {
-      PUBLIC_KEY_URL = "https://${module.cloudfront.cloudfront_domain_name}/jwt/${var.environment}/reservation/public_key.pem"
-      # Authorization 대칭키(HS256) — 값이 아닌 이름만, 런타임에 Secrets 확장 캐시로 조회
-      AUTHORIZATION_SECRET_ARN = module.data.authorization_secret_arn
-    }
-    # captcha — HMAC 시크릿은 값이 아닌 이름만 주입, 런타임에 Secrets 확장 캐시로 조회
-    captcha = {
-      CAPTCHA_SECRET_ID = "${var.environment}-captcha-hmac-secret"
-    }
-  }
-
-  # Secrets Manager 를 런타임 조회하는 Lambda 에 확장 레이어 부착 — 시크릿 캐시(호출 수·비용 절감)
-  layers = {
-    captcha    = [var.secrets_extension_layer_arn]
-    authorizer = [var.secrets_extension_layer_arn]
-    ticketing  = [var.secrets_extension_layer_arn]
-  }
+moved {
+  from = module.sqs
+  to   = module.async.module.sqs
+}
+moved {
+  from = module.eventbridge
+  to   = module.async.module.eventbridge
+}
+moved {
+  from = aws_lambda_event_source_mapping.persistence_sqs
+  to   = module.async.aws_lambda_event_source_mapping.persistence_sqs
 }
 
 # 로그 그룹 소유 cloudwatch→lambda 이관 — 물리 그룹 동일, state 주소만 이동(재생성 없음)
 moved {
   from = module.cloudwatch.aws_cloudwatch_log_group.lambda["cc-dev-authorizer"]
-  to   = module.lambda.aws_cloudwatch_log_group.this["authorizer"]
+  to   = module.async.module.lambda.aws_cloudwatch_log_group.this["authorizer"]
 }
 moved {
   from = module.cloudwatch.aws_cloudwatch_log_group.lambda["cc-dev-ticketing"]
-  to   = module.lambda.aws_cloudwatch_log_group.this["ticketing"]
+  to   = module.async.module.lambda.aws_cloudwatch_log_group.this["ticketing"]
 }
 moved {
   from = module.cloudwatch.aws_cloudwatch_log_group.lambda["cc-dev-persistence"]
-  to   = module.lambda.aws_cloudwatch_log_group.this["persistence"]
+  to   = module.async.module.lambda.aws_cloudwatch_log_group.this["persistence"]
 }
 
 # API Gateway — 백엔드(EKS NLB ↔ test-EC2)는 var.api_backend 로 선택, queue 는 ticketing 람다
@@ -341,16 +320,16 @@ module "apigateway" {
     }
   }
 
-  queue_lambda_invoke_arn    = module.lambda.invoke_arns["ticketing"]
-  queue_lambda_function_name = module.lambda.function_names["ticketing"]
+  queue_lambda_invoke_arn    = module.async.invoke_arns["ticketing"]
+  queue_lambda_function_name = module.async.function_names["ticketing"]
 
   # captcha Lambda 가 배포(lambda-modules.txt 등록)됐을 때만 라우트 생성 — 미배포 시 plan 실패 방지
-  enable_captcha_route         = contains(keys(module.lambda.function_names), "captcha")
-  captcha_lambda_invoke_arn    = lookup(module.lambda.invoke_arns, "captcha", "")
-  captcha_lambda_function_name = lookup(module.lambda.function_names, "captcha", "")
+  enable_captcha_route         = contains(keys(module.async.function_names), "captcha")
+  captcha_lambda_invoke_arn    = lookup(module.async.invoke_arns, "captcha", "")
+  captcha_lambda_function_name = lookup(module.async.function_names, "captcha", "")
 
-  authorizer_lambda_invoke_arn    = module.lambda.invoke_arns["authorizer"]
-  authorizer_lambda_function_name = module.lambda.function_names["authorizer"]
+  authorizer_lambda_invoke_arn    = module.async.invoke_arns["authorizer"]
+  authorizer_lambda_function_name = module.async.function_names["authorizer"]
 
   # 커스텀 도메인 (api.<domain>) — REGIONAL + ACM(DNS 검증, 기존 존 사용)
   api_domain_name = "api.${var.domain_name}"
@@ -391,9 +370,9 @@ module "cloudwatch" {
 
   # Lambda
   lambda_function_names = [
-    module.lambda.function_names["authorizer"],
-    module.lambda.function_names["ticketing"],
-    module.lambda.function_names["persistence"],
+    module.async.function_names["authorizer"],
+    module.async.function_names["ticketing"],
+    module.async.function_names["persistence"],
   ]
 
   # CloudFront
@@ -406,7 +385,7 @@ module "cloudwatch" {
   ]
 
   # SQS
-  sqs_queue_names = [module.sqs.queue_name]
+  sqs_queue_names = [module.async.queue_name]
 
   # EKS (틀만 — 모듈 연결 후 활성화)
   eks_cluster_name = ""
@@ -497,9 +476,3 @@ module "prometheus" {
   eks_cluster_name = ""
 }
 
-module "eventbridge" {
-  source = "../../modules/eventbridge"
-
-  project_name = var.project_name
-  environment  = var.environment
-}
