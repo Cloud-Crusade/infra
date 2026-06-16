@@ -8,6 +8,8 @@ resource "aws_lb" "this" {
   enable_deletion_protection = var.enable_deletion_protection
 
   enable_zonal_shift = var.enable_zonal_shift
+  # AZ Shift를 위해 필요한 설정
+  enable_cross_zone_load_balancing = false
 
   tags = {
     Environment = var.environment
@@ -62,6 +64,11 @@ resource "aws_lb_target_group" "svc" {
     path                = var.health_check_path
     healthy_threshold   = 3
     unhealthy_threshold = 3
+  }
+
+  target_failover {
+    on_deregistration = "no_rebalance"
+    on_unhealthy      = "no_rebalance"
   }
 
   tags = {
