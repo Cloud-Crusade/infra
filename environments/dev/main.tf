@@ -293,6 +293,20 @@ module "lambda" {
   }
 }
 
+# 로그 그룹 소유 cloudwatch→lambda 이관 — 물리 그룹 동일, state 주소만 이동(재생성 없음)
+moved {
+  from = module.cloudwatch.aws_cloudwatch_log_group.lambda["cc-dev-authorizer"]
+  to   = module.lambda.aws_cloudwatch_log_group.this["authorizer"]
+}
+moved {
+  from = module.cloudwatch.aws_cloudwatch_log_group.lambda["cc-dev-ticketing"]
+  to   = module.lambda.aws_cloudwatch_log_group.this["ticketing"]
+}
+moved {
+  from = module.cloudwatch.aws_cloudwatch_log_group.lambda["cc-dev-persistence"]
+  to   = module.lambda.aws_cloudwatch_log_group.this["persistence"]
+}
+
 # API Gateway — 백엔드(EKS NLB ↔ test-EC2)는 var.api_backend 로 선택, queue 는 ticketing 람다
 module "apigateway" {
   source       = "../../modules/apigateway"

@@ -80,13 +80,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_storage" {
 }
 
 # ===== Lambda 알람 =====
-
-resource "aws_cloudwatch_log_group" "lambda" {
-  for_each = toset(var.lambda_function_names)
-
-  name              = "/aws/lambda/${each.key}"
-  retention_in_days = 14
-}
+# 로그 그룹은 lambda 모듈이 소유(logging_config 로 런타임 자동 생성 충돌 회피) → 여기선 알람만.
 
 resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   for_each = toset(var.lambda_function_names)

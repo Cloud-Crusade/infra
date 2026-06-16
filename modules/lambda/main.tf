@@ -20,6 +20,14 @@ locals {
   ])
 }
 
+# 로그 그룹을 terraform 이 선점 소유 — 함수가 logging_config 로 이 그룹을 명시해 런타임 자동 생성(ResourceAlreadyExists 충돌) 차단
+resource "aws_cloudwatch_log_group" "this" {
+  for_each = local.modules
+
+  name              = "/aws/lambda/${var.project_name}-${var.environment}-${each.key}"
+  retention_in_days = var.log_retention_in_days
+}
+
 resource "aws_lambda_function" "this" {
   for_each = local.modules
 
@@ -31,6 +39,11 @@ resource "aws_lambda_function" "this" {
 
   # 모듈별 Lambda Layer (예: captcha 의 Secrets 확장 레이어 — 런타임 시크릿 캐시 조회)
   layers = lookup(var.layers, each.key, null)
+
+  logging_config {
+    log_format = "Text"
+    log_group  = aws_cloudwatch_log_group.this[each.key].name
+  }
 
   # 코드: S3 zip (lambda/<module>.zip)
   s3_bucket = var.artifact_bucket
