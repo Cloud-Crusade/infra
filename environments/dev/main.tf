@@ -19,8 +19,9 @@ terraform {
       version = "~> 3.0"
     }
     kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.0"
+      source = "hashicorp/kubernetes"
+      # 2.38.0 의 resource identity 가 refresh 시 Unexpected Identity Change 유발 → 도입 직전 2.37.x 로 핀
+      version = "~> 2.37.0"
     }
   }
 }
