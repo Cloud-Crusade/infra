@@ -4,7 +4,7 @@ locals {
 }
 
 # CA IAM 정책 — 조회는 전체, 쓰기(SetDesiredCapacity/Terminate)는 이 클러스터 태그 ASG 로 한정(최소 권한).
-# EKS 관리형 노드그룹은 ASG 에 k8s.io/cluster-autoscaler/<cluster>=owned 태그를 자동 부착.
+# 자동탐색 태그(k8s.io/cluster-autoscaler/*)는 modules/eks 에서 노드그룹 ASG 에 명시 부착.
 resource "aws_iam_policy" "this" {
   name = local.name
   policy = jsonencode({
@@ -81,7 +81,7 @@ resource "helm_release" "this" {
   version    = var.chart_version
   namespace  = var.namespace
 
-  values = [yamlencode(merge({
+  values = [yamlencode({
     autoDiscovery = { clusterName = var.cluster_name }
     awsRegion     = var.region
     rbac = {
@@ -94,7 +94,5 @@ resource "helm_release" "this" {
       balance-similar-node-groups = true
       skip-nodes-with-system-pods = false
     }
-    }, var.image_tag == "" ? {} : {
-    image = { tag = var.image_tag }
-  }))]
+  })]
 }

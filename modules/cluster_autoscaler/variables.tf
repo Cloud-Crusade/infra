@@ -40,16 +40,10 @@ variable "service_account_name" {
   default     = "cluster-autoscaler"
 }
 
-# chart 9.57.0 (appVersion 1.35.0). CA 이미지는 클러스터 k8s 마이너와 정합 권장.
+# CA 는 클러스터 k8s 마이너와 정합 권장(CA vX.Y ↔ k8s 1.Y). 차트 appVersion 이 곧 CA 버전 →
+# 클러스터 k8s 마이너에 맞는 차트 버전을 지정한다(기본 9.57.0 = appVersion 1.35.0).
 variable "chart_version" {
-  description = "cluster-autoscaler Helm 차트 버전"
+  description = "cluster-autoscaler Helm 차트 버전 (클러스터 k8s 마이너에 맞춤)"
   type        = string
   default     = "9.57.0"
-}
-
-# 비우면 차트 기본 이미지 사용. 엄격한 버전 정합이 필요하면 클러스터 k8s 마이너에 맞는 태그(예: v1.32.0) 지정
-variable "image_tag" {
-  description = "CA 이미지 태그 오버라이드 (빈 값이면 차트 기본)"
-  type        = string
-  default     = ""
 }

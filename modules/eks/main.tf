@@ -84,6 +84,25 @@ resource "aws_eks_node_group" "this" {
   }
 }
 
+# Cluster Autoscaler 자동탐색 태그 — 노드그룹 ASG 에 명시 부착.
+# 관리형 노드그룹 자동 부착 여부에 의존하지 않고 보장(같은 값이라 멱등 — 자동 부착돼도 충돌 없음).
+resource "aws_autoscaling_group_tag" "cluster_autoscaler" {
+  for_each = merge([
+    for ng in keys(local.node_groups) : {
+      "${ng}/enabled" = { ng = ng, key = "k8s.io/cluster-autoscaler/enabled", value = "true" }
+      "${ng}/owned"   = { ng = ng, key = "k8s.io/cluster-autoscaler/${local.cluster_name}", value = "owned" }
+    }
+  ]...)
+
+  autoscaling_group_name = aws_eks_node_group.this[each.value.ng].resources[0].autoscaling_groups[0].name
+
+  tag {
+    key                 = each.value.key
+    value               = each.value.value
+    propagate_at_launch = false
+  }
+}
+
 # EKS 애드온
 resource "aws_eks_addon" "vpc_cni" {
   cluster_name             = aws_eks_cluster.this.name
