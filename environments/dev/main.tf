@@ -87,10 +87,6 @@ module "network" {
   enable_secretsmanager_endpoint = true
 }
 
-moved {
-  from = module.vpc
-  to   = module.network.module.vpc
-}
 
 # SM 엔드포인트 인바운드(443) — 실제 SM 접근이 필요한 lambda SG 만 허용(최소권한, 모듈 순환 회피)
 resource "aws_security_group_rule" "sm_endpoint_from_lambda" {
@@ -170,26 +166,6 @@ module "cluster" {
   db_password = var.db_password
 }
 
-moved {
-  from = module.eks
-  to   = module.cluster.module.eks
-}
-moved {
-  from = module.metrics_server
-  to   = module.cluster.module.metrics_server
-}
-moved {
-  from = module.aws_lb_controller
-  to   = module.cluster.module.aws_lb_controller
-}
-moved {
-  from = module.cluster_autoscaler
-  to   = module.cluster.module.cluster_autoscaler
-}
-moved {
-  from = module.prometheus
-  to   = module.cluster.module.prometheus
-}
 module "data" {
   source = "../../modules/data"
 
@@ -212,18 +188,6 @@ module "data" {
   captcha_hmac_secret_value     = random_password.captcha_hmac.result
 }
 
-moved {
-  from = module.rds
-  to   = module.data.module.rds
-}
-moved {
-  from = module.elasticache
-  to   = module.data.module.elasticache
-}
-moved {
-  from = module.secrets_manager
-  to   = module.data.module.secrets_manager
-}
 module "iam" {
   source            = "../../modules/iam"
   project_name      = var.project_name
@@ -247,14 +211,6 @@ module "frontend" {
   public_bucket_domain_name = var.public_bucket_domain_name
 }
 
-moved {
-  from = module.acm_www
-  to   = module.frontend.module.acm_www
-}
-moved {
-  from = module.cloudfront
-  to   = module.frontend.module.cloudfront
-}
 
 # 비동기/서버리스 — lambda·sqs·eventbridge + persistence SQS→Lambda 트리거
 module "async" {
@@ -279,36 +235,8 @@ module "async" {
   db_password = var.db_password
 }
 
-moved {
-  from = module.lambda
-  to   = module.async.module.lambda
-}
-moved {
-  from = module.sqs
-  to   = module.async.module.sqs
-}
-moved {
-  from = module.eventbridge
-  to   = module.async.module.eventbridge
-}
-moved {
-  from = aws_lambda_event_source_mapping.persistence_sqs
-  to   = module.async.aws_lambda_event_source_mapping.persistence_sqs
-}
 
 # 로그 그룹 소유 cloudwatch→lambda 이관 — 물리 그룹 동일, state 주소만 이동(재생성 없음)
-moved {
-  from = module.cloudwatch.aws_cloudwatch_log_group.lambda["cc-dev-authorizer"]
-  to   = module.async.module.lambda.aws_cloudwatch_log_group.this["authorizer"]
-}
-moved {
-  from = module.cloudwatch.aws_cloudwatch_log_group.lambda["cc-dev-ticketing"]
-  to   = module.async.module.lambda.aws_cloudwatch_log_group.this["ticketing"]
-}
-moved {
-  from = module.cloudwatch.aws_cloudwatch_log_group.lambda["cc-dev-persistence"]
-  to   = module.async.module.lambda.aws_cloudwatch_log_group.this["persistence"]
-}
 
 # API 라우팅 — apigateway·nlb·route53. test_backend_url 은 ops 의 test_service, 백엔드 람다는 async
 module "api" {
@@ -334,18 +262,6 @@ module "api" {
   cloudfront_zone_id     = var.cloudfront_zone_id
 }
 
-moved {
-  from = module.apigateway
-  to   = module.api.module.apigateway
-}
-moved {
-  from = module.nlb
-  to   = module.api.module.nlb
-}
-moved {
-  from = module.route53
-  to   = module.api.module.route53
-}
 
 module "cloudwatch" {
   source = "../../modules/cloudwatch"
@@ -443,47 +359,3 @@ module "ops" {
   test_service_ingress_cidrs = var.test_service_ingress_cidrs
 }
 
-moved {
-  from = aws_instance.bastion
-  to   = module.ops.aws_instance.bastion
-}
-moved {
-  from = tls_private_key.bastion
-  to   = module.ops.tls_private_key.bastion
-}
-moved {
-  from = aws_key_pair.bastion
-  to   = module.ops.aws_key_pair.bastion
-}
-moved {
-  from = local_file.bastion_private_key
-  to   = module.ops.local_file.bastion_private_key
-}
-moved {
-  from = aws_s3_object.bastion_private_key
-  to   = module.ops.aws_s3_object.bastion_private_key
-}
-moved {
-  from = aws_iam_role.test_ec2
-  to   = module.ops.aws_iam_role.test_ec2
-}
-moved {
-  from = aws_iam_role_policy_attachment.test_ec2_ecr
-  to   = module.ops.aws_iam_role_policy_attachment.test_ec2_ecr
-}
-moved {
-  from = aws_iam_role_policy.test_ec2_sqs
-  to   = module.ops.aws_iam_role_policy.test_ec2_sqs
-}
-moved {
-  from = aws_iam_instance_profile.test_ec2
-  to   = module.ops.aws_iam_instance_profile.test_ec2
-}
-moved {
-  from = aws_security_group.test_ec2
-  to   = module.ops.aws_security_group.test_ec2
-}
-moved {
-  from = aws_instance.test_service
-  to   = module.ops.aws_instance.test_service
-}
