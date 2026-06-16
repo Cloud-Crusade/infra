@@ -115,3 +115,8 @@ output "dashboard_arn" {
   description = "CloudWatch dashboard ARN"
   value       = aws_cloudwatch_dashboard.main.dashboard_arn
 }
+
+output "arc_zonal_shift_alarm_arn" {
+  description = "ARC Zonal Shift outcome alarm ARN"
+  value       = aws_cloudwatch_metric_alarm.arc_zonal_shift.arn
+}
