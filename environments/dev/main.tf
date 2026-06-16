@@ -469,6 +469,9 @@ module "aws_lb_controller" {
 
   oidc_provider_arn = module.eks.oidc_provider_arn
   oidc_provider_url = module.eks.oidc_issuer_url
+
+  # 입력은 컨트롤 플레인에만 의존 → 노드 준비 후 배포되도록 명시 의존(helm wait 타임아웃 방지)
+  depends_on = [module.eks]
 }
 
 # Cluster Autoscaler — 관리형 노드그룹(system/app) ASG desired 를 자동 조정(노드 오토스케일링)
@@ -482,6 +485,9 @@ module "cluster_autoscaler" {
 
   oidc_provider_arn = module.eks.oidc_provider_arn
   oidc_provider_url = module.eks.oidc_issuer_url
+
+  # 입력은 컨트롤 플레인에만 의존 → 노드 준비 후 배포되도록 명시 의존(helm wait 타임아웃 방지)
+  depends_on = [module.eks]
 }
 
 module "prometheus" {
