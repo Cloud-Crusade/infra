@@ -15,6 +15,13 @@ on:
         options:
           - apply
           - destroy
+      api_backend:
+        description: API GW 백엔드 (dev apply 전용 — prod 는 무시)
+        type: choice
+        default: eks
+        options:
+          - eks
+          - test_ec2
 
 jobs:
   terraform:
@@ -56,6 +63,9 @@ jobs:
       - name: Terraform apply
         if: inputs.action == 'apply'
         working-directory: environments/${{ inputs.environment }}
+        # 워크플로우 입력으로 백엔드 선택(step env 가 GitHub vars 매핑보다 우선). prod 는 변수 미선언이라 무시
+        env:
+          TF_VAR_api_backend: ${{ inputs.api_backend }}
         run: terraform apply -auto-approve -input=false -lock-timeout=5m
 
       # destroy 는 ①람다 → ②ENI drain → ③전체 의 staged 단계로 분리.
