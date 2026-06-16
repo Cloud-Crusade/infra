@@ -72,20 +72,6 @@ variable "bastion_key_name" {
   type        = string
 }
 
-# ===== IAM =====
-
-variable "oidc_provider_arn" {
-  description = "EKS OIDC Provider ARN"
-  type        = string
-  default     = ""
-}
-
-variable "oidc_provider_url" {
-  description = "EKS OIDC Provider URL"
-  type        = string
-  default     = ""
-}
-
 # ===== RDS =====
 
 variable "db_name" {

@@ -41,8 +41,6 @@ eks_app_ng_max_size       = 3
 
 # TODO: 클러스터 접근이 필요한 IAM Role/User 추가
 eks_access_entries = []
-oidc_provider_arn  = ""
-oidc_provider_url  = ""
 
 db_username = "ccadmin"
 # db_password 는 민감값 → tfvars 평문 금지.

@@ -8,11 +8,6 @@ variable "environment" {
   description = "배포 환경"
 }
 
-variable "lambda_role_arn" {
-  type        = string
-  description = "Lambda 함수 실행에 필요한 IAM Role ARN (모든 Lambda 공통)"
-}
-
 variable "artifact_bucket" {
   type        = string
   description = "lambda-modules.txt 와 <module>.zip 이 있는 S3 버킷"

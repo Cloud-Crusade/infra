@@ -8,10 +8,6 @@ variable "environment" {
 }
 
 # ================== lambda ==================
-variable "lambda_role_arn" {
-  type = string
-}
-
 variable "lambda_sg_id" {
   type = string
 }

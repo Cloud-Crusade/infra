@@ -96,23 +96,6 @@ variable "app_ng_max_size" {
   type = number
 }
 
-# ================== IAM (eks 롤 — root iam 모듈에서 주입) ==================
-variable "cluster_role_arn" {
-  type = string
-}
-
-variable "node_role_arn" {
-  type = string
-}
-
-variable "vpc_cni_role_arn" {
-  type = string
-}
-
-variable "ebs_csi_role_arn" {
-  type = string
-}
-
 # ================== 워크로드(ticketing) ==================
 variable "domain_name" {
   type = string

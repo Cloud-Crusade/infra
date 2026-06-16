@@ -32,7 +32,7 @@ resource "aws_lambda_function" "this" {
   for_each = local.modules
 
   function_name = "${var.project_name}-${var.environment}-${each.key}"
-  role          = var.lambda_role_arn
+  role          = aws_iam_role.lambda.arn
   runtime       = var.runtime
   handler       = var.handler
   timeout       = var.timeout
@@ -82,6 +82,9 @@ resource "aws_lambda_function" "this" {
       error_message = "vpc_modules 사용 시 vpc_subnet_ids 와 vpc_security_group_ids 가 비어있지 않아야 합니다."
     }
   }
+
+  # VPC 연결 람다는 생성 시 ENI 권한 필요 → 정책 연결 후 생성
+  depends_on = [aws_iam_role_policy_attachment.vpc_access]
 }
 
 # Function URL — 명시한 모듈만 생성(기본 없음)

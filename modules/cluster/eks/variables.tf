@@ -19,26 +19,6 @@ variable "additional_security_group_ids" {
   default     = []
 }
 
-variable "cluster_role_arn" {
-  description = "EKS 클러스터 컨트롤 플레인에 부여할 IAM 역할 ARN"
-  type        = string
-}
-
-variable "node_role_arn" {
-  description = "EKS 노드 그룹 EC2 인스턴스에 부여할 IAM 역할 ARN"
-  type        = string
-}
-
-variable "vpc_cni_role_arn" {
-  description = "vpc-cni 애드온 IRSA용 IAM 역할 ARN"
-  type        = string
-}
-
-variable "ebs_csi_role_arn" {
-  description = "aws-ebs-csi-driver 애드온 IRSA용 IAM 역할 ARN"
-  type        = string
-}
-
 # ============================================================
 # 클러스터
 # ============================================================
