@@ -73,8 +73,8 @@ provider "kubernetes" {
   }
 }
 
-module "vpc" {
-  source = "../../modules/vpc"
+module "network" {
+  source = "../../modules/network"
 
   project_name         = var.project_name
   environment          = var.environment
@@ -87,10 +87,15 @@ module "vpc" {
   enable_secretsmanager_endpoint = true
 }
 
+moved {
+  from = module.vpc
+  to   = module.network.module.vpc
+}
+
 # SM 엔드포인트 인바운드(443) — 실제 SM 접근이 필요한 lambda SG 만 허용(최소권한, 모듈 순환 회피)
 resource "aws_security_group_rule" "sm_endpoint_from_lambda" {
   type                     = "ingress"
-  security_group_id        = module.vpc.secretsmanager_endpoint_security_group_id
+  security_group_id        = module.network.secretsmanager_endpoint_security_group_id
   source_security_group_id = module.security_groups.lambda_sg_id
   from_port                = 443
   to_port                  = 443
@@ -102,8 +107,8 @@ module "security_groups" {
   source            = "../../modules/security_group"
   project_name      = var.project_name
   environment       = var.environment
-  vpc_id            = module.vpc.vpc_id
-  vpc_cidr          = module.vpc.vpc_cidr
+  vpc_id            = module.network.vpc_id
+  vpc_cidr          = module.network.vpc_cidr
   allowed_ssh_cidrs = var.allowed_ssh_cidrs
 }
 
@@ -112,7 +117,7 @@ module "eks" {
 
   project_name = var.project_name
   environment  = var.environment
-  subnet_ids   = module.vpc.private_subnet_ids
+  subnet_ids   = module.network.private_subnet_ids
 
   additional_security_group_ids = [module.security_groups.eks_sg_id]
 
@@ -206,7 +211,7 @@ module "rds" {
   allocated_storage      = var.db_allocated_storage
   vpc_security_group_ids = [module.security_groups.rds_sg_id]
   azs                    = var.availability_zones
-  subnet_ids             = module.vpc.private_subnet_ids
+  subnet_ids             = module.network.private_subnet_ids
 }
 # www 커스텀 도메인용 ACM 인증서 — CloudFront 는 us-east-1 인증서만 허용
 module "acm_www" {
@@ -256,7 +261,7 @@ module "lambda" {
 
   # ticketing → ElastiCache, persistence → RDS (VPC 내부). authorizer 는 CloudFront 접근 위해 VPC 제외
   vpc_modules            = ["ticketing", "persistence"]
-  vpc_subnet_ids         = module.vpc.private_subnet_ids
+  vpc_subnet_ids         = module.network.private_subnet_ids
   vpc_security_group_ids = [module.security_groups.lambda_sg_id]
 
   lambda_env = {
@@ -334,7 +339,7 @@ module "apigateway" {
 module "elasticache" {
   source            = "../../modules/elasticache"
   subnet_group_name = "${var.project_name}-${var.environment}-cache"
-  subnet_ids        = module.vpc.private_subnet_ids
+  subnet_ids        = module.network.private_subnet_ids
 
   main_cache_replication_group_id = "${var.project_name}-${var.environment}-main-cache"
   main_cache_engine               = "valkey"
@@ -427,9 +432,9 @@ module "nlb" {
 
   project_name = var.project_name
   environment  = var.environment
-  subnet_ids   = module.vpc.private_subnet_ids
-  vpc_id       = module.vpc.vpc_id
-  vpc_cidr     = module.vpc.vpc_cidr
+  subnet_ids   = module.network.private_subnet_ids
+  vpc_id       = module.network.vpc_id
+  vpc_cidr     = module.network.vpc_cidr
   target_port  = var.ticketing_http_port
 
   # 4서비스 외부 노출 — 포트로 분리, API GW(#136)가 경로별로 연결
@@ -469,7 +474,7 @@ module "aws_lb_controller" {
   environment  = var.environment
   cluster_name = module.eks.cluster_name
   region       = var.aws_region
-  vpc_id       = module.vpc.vpc_id
+  vpc_id       = module.network.vpc_id
 
   oidc_provider_arn = module.eks.oidc_provider_arn
   oidc_provider_url = module.eks.oidc_issuer_url
