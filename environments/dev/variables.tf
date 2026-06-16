@@ -182,3 +182,11 @@ variable "captcha_enabled" {
   default     = false
 }
 
+# ==== ARC =====
+variable "lb_arn_suffix" {
+  type = string
+}
+
+variable "target_group_arn_suffix" {
+  type = string
+}
