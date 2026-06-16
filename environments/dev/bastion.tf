@@ -37,29 +37,29 @@ resource "aws_instance" "bastion" {
   }
 
   user_data = <<-EOF
-
+                #!/bin/bash
                 # docker compsoe 설치
-                  mkdir -p /usr/libexec/docker/cli-plugins/
-                  curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
-                  chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+                mkdir -p /usr/libexec/docker/cli-plugins/
+                curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
+                chmod +x /usr/libexec/docker/cli-plugins/docker-compose
 
-                  # k6 설치
-                  dnf install -y https://dl.k6.io/rpm/repo.rpm
-                  dnf install -y k6 
+                # k6 설치
+                dnf install -y https://dl.k6.io/rpm/repo.rpm
+                dnf install -y k6 
 
-                  # stress 설치
-                  dnf install -y stres
-            
-                  # grafana compose 파일 생성
-                  mkdir -p /home/ec2-user/grafana
-                  cat > /home/ec2-user/grafana/docker-compose.yml <<'COMPOSE'
-                  ${file("${path.module}/compose/grafana/docker-compose.yml")}
-                  COMPOSE
+                # stress 설치
+                dnf install -y stres
+          
+                # grafana compose 파일 생성
+                mkdir -p /home/ec2-user/grafana
+                cat > /home/ec2-user/grafana/docker-compose.yml <<'COMPOSE'
+                ${file("${path.module}/compose/grafana/docker-compose.yml")}
+                COMPOSE
 
-                  # grafana 실행
-                  cd /home/ec2-user/grafana
-                  docker compose up -d
-                  EOF
+                # grafana 실행
+                cd /home/ec2-user/grafana
+                docker compose up -d
+                EOF
 }
 
 # bastion 개인키를 backend(state) 와 동일한 S3 버킷에 업로드 (팀 SSH 접근용)
