@@ -161,11 +161,11 @@ module "eks" {
   ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 
   # RDS/ElastiCache 고정 DNS(ExternalName) 타깃 — 엔드포인트 컷오버 시 타깃만 갱신
-  rds_core_writer_endpoint        = module.rds.primary_endpoint
-  rds_core_reader_endpoint        = module.rds.primary_replica_endpoint
-  rds_reservation_writer_endpoint = module.rds.reservation_endpoint
-  rds_reservation_reader_endpoint = module.rds.reservation_replica_endpoint
-  redis_main_endpoint             = module.elasticache.main_cache_endpoint
+  rds_core_writer_endpoint        = module.data.primary_endpoint
+  rds_core_reader_endpoint        = module.data.primary_replica_endpoint
+  rds_reservation_writer_endpoint = module.data.reservation_endpoint
+  rds_reservation_reader_endpoint = module.data.reservation_replica_endpoint
+  redis_main_endpoint             = module.data.main_cache_endpoint
 
   # reservation IRSA(SendMessage) + ConfigMap 큐 URL
   sqs_queue_url = module.sqs.queue_url
@@ -180,17 +180,39 @@ module "eks" {
   db_username = var.db_username
   db_password = var.db_password
 }
-module "secrets_manager" {
-  source                        = "../../modules/secrets_manager"
-  project_name                  = var.project_name
-  environment                   = var.environment
+module "data" {
+  source = "../../modules/data"
+
+  project_name       = var.project_name
+  environment        = var.environment
+  subnet_ids         = module.network.private_subnet_ids
+  availability_zones = var.availability_zones
+  rds_sg_id          = module.security_groups.rds_sg_id
+  cache_sg_id        = module.security_groups.cache_sg_id
+
+  db_name              = var.db_name
+  db_username          = var.db_username
+  db_password          = var.db_password
+  db_instance_class    = var.db_instance_class
+  db_engine_version    = var.db_engine_version
+  db_allocated_storage = var.db_allocated_storage
+
   authorization_secret_value    = random_password.authorization.result
   reservation_private_key_value = tls_private_key.reservation.private_key_pem
-  rds_username                  = var.db_username
-  rds_password                  = var.db_password
-  core_writer_endpoint          = module.rds.primary_endpoint
-  reservation_writer_endpoint   = module.rds.reservation_endpoint
   captcha_hmac_secret_value     = random_password.captcha_hmac.result
+}
+
+moved {
+  from = module.rds
+  to   = module.data.module.rds
+}
+moved {
+  from = module.elasticache
+  to   = module.data.module.elasticache
+}
+moved {
+  from = module.secrets_manager
+  to   = module.data.module.secrets_manager
 }
 module "iam" {
   source            = "../../modules/iam"
@@ -198,20 +220,6 @@ module "iam" {
   environment       = var.environment
   oidc_provider_arn = var.oidc_provider_arn
   oidc_provider_url = var.oidc_provider_url
-}
-module "rds" {
-  source                 = "../../modules/rds"
-  project_name           = var.project_name
-  environment            = var.environment
-  db_name                = var.db_name
-  db_username            = var.db_username
-  db_password            = var.db_password
-  instance_class         = var.db_instance_class
-  engine_version         = var.db_engine_version
-  allocated_storage      = var.db_allocated_storage
-  vpc_security_group_ids = [module.security_groups.rds_sg_id]
-  azs                    = var.availability_zones
-  subnet_ids             = module.network.private_subnet_ids
 }
 # www 커스텀 도메인용 ACM 인증서 — CloudFront 는 us-east-1 인증서만 허용
 module "acm_www" {
@@ -267,22 +275,22 @@ module "lambda" {
   lambda_env = {
     persistence = {
       # SQS 로 받은 예약 데이터를 reservation RDS 에 적재(psycopg2). URL 은 rds 에서 구성
-      RESERVATION_DB_URL = "postgresql://${var.db_username}:${var.db_password}@${module.rds.reservation_endpoint}/${var.db_name}"
+      RESERVATION_DB_URL = "postgresql://${var.db_username}:${var.db_password}@${module.data.reservation_endpoint}/${var.db_name}"
     }
     ticketing = {
-      REDIS_HOST = module.elasticache.waiting_room_cache_endpoint
+      REDIS_HOST = module.data.waiting_room_cache_endpoint
       REDIS_PORT = "6379"
       # 예약 서명키(RSA 개인키)는 값이 아닌 이름만 — 런타임에 Secrets 확장 캐시로 조회(VPC 엔드포인트 경유)
-      RESERVATION_SECRET_ID = module.secrets_manager.reservation_private_key_secret_arn
+      RESERVATION_SECRET_ID = module.data.reservation_private_key_secret_arn
       # access token(HS256) 검증용 — 큐가 sub→user_id 추출. authorizer 와 동일 시크릿
-      AUTHORIZATION_SECRET_ID = module.secrets_manager.authorization_secret_arn
+      AUTHORIZATION_SECRET_ID = module.data.authorization_secret_arn
     }
     # 예약 토큰 서명 검증 authorizer — CloudFront 로 reservation 공개키 fetch(RS256 검증)
     # S3 직접 접근 대신 CloudFront URL → S3 IAM 불필요 + 접근 비용 절감
     authorizer = {
       PUBLIC_KEY_URL = "https://${module.cloudfront.cloudfront_domain_name}/jwt/${var.environment}/reservation/public_key.pem"
       # Authorization 대칭키(HS256) — 값이 아닌 이름만, 런타임에 Secrets 확장 캐시로 조회
-      AUTHORIZATION_SECRET_ARN = module.secrets_manager.authorization_secret_arn
+      AUTHORIZATION_SECRET_ARN = module.data.authorization_secret_arn
     }
     # captcha — HMAC 시크릿은 값이 아닌 이름만 주입, 런타임에 Secrets 확장 캐시로 조회
     captcha = {
@@ -349,40 +357,6 @@ module "apigateway" {
   route53_zone_id = var.route53_zone_id
 }
 
-# ElastiCache (Redis/Valkey) — 서브넷그룹은 모듈 내부 생성, SG 는 security_group 모듈
-module "elasticache" {
-  source            = "../../modules/elasticache"
-  subnet_group_name = "${var.project_name}-${var.environment}-cache"
-  subnet_ids        = module.network.private_subnet_ids
-
-  main_cache_replication_group_id = "${var.project_name}-${var.environment}-main-cache"
-  main_cache_engine               = "valkey"
-  main_cache_engine_version       = "8.0"
-  main_cache_parameter_group_name = "default.valkey8"
-  main_cache_node_type            = "cache.t3.micro"
-  main_cache_port                 = 6379
-  main_cache_num_clusters         = 1
-  main_cache_sg_id                = module.security_groups.cache_sg_id
-
-  waiting_room_replication_group_id   = "${var.project_name}-${var.environment}-waiting-room"
-  waiting_room_engine                 = "redis"
-  waiting_room_engine_version         = "7.1"
-  waiting_room_parameter_group_family = "redis7"
-  waiting_room_node_type              = "cache.t3.micro"
-  waiting_room_port                   = 6379
-  waiting_room_num_clusters           = 1
-  waiting_room_sg_id                  = module.security_groups.cache_sg_id
-
-  blacklist_replication_group_id   = "${var.project_name}-${var.environment}-blacklist"
-  blacklist_engine                 = "redis"
-  blacklist_engine_version         = "7.1"
-  blacklist_parameter_group_family = "redis7"
-  blacklist_node_type              = "cache.t3.micro"
-  blacklist_port                   = 6379
-  blacklist_num_clusters           = 1
-  blacklist_sg_id                  = module.security_groups.cache_sg_id
-}
-
 # Route53 레코드 — www → CloudFront(클라이언트), api → ALB(서버)
 # 호스팅 영역은 기존 존 참조(route53_zone_id). api 는 apigateway 커스텀 도메인(REGIONAL) 출력으로 연결.
 module "route53" {
@@ -427,8 +401,8 @@ module "cloudwatch" {
 
   # ElastiCache
   elasticache_cluster_ids = [
-    module.elasticache.main_cache_cluster_id,
-    module.elasticache.waiting_room_cache_cluster_id,
+    module.data.main_cache_cluster_id,
+    module.data.waiting_room_cache_cluster_id,
   ]
 
   # SQS
