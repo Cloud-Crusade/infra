@@ -60,6 +60,11 @@ variable "vpc_cidr" {
   type = string
 }
 
+variable "private_subnet_cidrs" {
+  description = "EKS 파드(private subnet) → RDS/Cache 접근 허용 CIDR"
+  type        = list(string)
+}
+
 variable "allowed_ssh_cidrs" {
   description = "bastion SSH 허용 IP"
   type        = list(string)

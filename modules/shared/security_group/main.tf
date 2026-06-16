@@ -22,44 +22,38 @@ resource "aws_security_group" "bastion" {
   }
 }
 
-# standalone 규칙 사용 — pod(클러스터 primary SG)로부터의 인바운드를 shared 교차 규칙으로 추가하기 위함
-# (인라인 ingress 와 aws_security_group_rule 은 동일 SG 에 혼용 불가)
 resource "aws_security_group" "rds" {
   name        = "${var.project_name}-${var.environment}-rds-sg"
   description = "Security Group for RDS instances"
   vpc_id      = var.vpc_id
 
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.bastion.id, aws_security_group.lambda.id, aws_security_group.eks.id]
+  }
+
+  # EKS 파드는 클러스터 primary SG 사용 — 인라인에서 cluster SG 참조 시 data→rds_sg→cluster 순환 →
+  # 파드가 위치한 private subnet CIDR 로 허용(순환·인라인↔standalone 혼용 회피)
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = var.private_subnet_cidrs
+  }
+
+  # 전 포트 허용(protocol -1)하되 목적지는 VPC 내부로만 한정
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
   tags = {
     Name = "${var.project_name}-${var.environment}-rds-sg"
   }
-}
-
-resource "aws_security_group_rule" "rds_from_bastion" {
-  type                     = "ingress"
-  security_group_id        = aws_security_group.rds.id
-  source_security_group_id = aws_security_group.bastion.id
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-}
-
-resource "aws_security_group_rule" "rds_from_lambda" {
-  type                     = "ingress"
-  security_group_id        = aws_security_group.rds.id
-  source_security_group_id = aws_security_group.lambda.id
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-}
-
-# 전 포트 허용(protocol -1)하되 목적지는 VPC 내부로만 한정
-resource "aws_security_group_rule" "rds_egress" {
-  type              = "egress"
-  security_group_id = aws_security_group.rds.id
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1"
-  cidr_blocks       = [var.vpc_cidr]
 }
 
 resource "aws_security_group" "eks" {
@@ -91,28 +85,31 @@ resource "aws_security_group" "cache" {
   description = "Security Group for ElastiCache (Redis/Valkey)"
   vpc_id      = var.vpc_id
 
+  # Redis 인바운드는 서비스 SG(lambda/eks) + 파드 private subnet CIDR 로 제한 — VPC 전체 개방 회피
+  ingress {
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.lambda.id, aws_security_group.eks.id]
+  }
+
+  ingress {
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    cidr_blocks = var.private_subnet_cidrs
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   tags = {
     Name = "${var.project_name}-${var.environment}-cache-sg"
   }
-}
-
-# Redis 인바운드는 서비스 SG 로 제한 — VPC 전체 개방 회피(최소 권한). pod(primary SG)는 shared 교차 규칙
-resource "aws_security_group_rule" "cache_from_lambda" {
-  type                     = "ingress"
-  security_group_id        = aws_security_group.cache.id
-  source_security_group_id = aws_security_group.lambda.id
-  from_port                = 6379
-  to_port                  = 6379
-  protocol                 = "tcp"
-}
-
-resource "aws_security_group_rule" "cache_egress" {
-  type              = "egress"
-  security_group_id = aws_security_group.cache.id
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1"
-  cidr_blocks       = ["0.0.0.0/0"]
 }
 
 # VPC 연결 람다용 SG (egress 로 ElastiCache/RDS 등 접근)
