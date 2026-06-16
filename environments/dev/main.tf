@@ -371,3 +371,12 @@ moved {
   from = module.security_groups
   to   = module.shared.module.security_group
 }
+module "eventbridge" {
+  source = "../../modules/eventbridge"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  target_lambda_arn           = module.lambda.function_arns["bot_block"]
+  target_lambda_function_name = module.lambda.function_names["bot_block"]
+}
