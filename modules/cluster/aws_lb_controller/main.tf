@@ -52,6 +52,8 @@ resource "helm_release" "this" {
     clusterName = var.cluster_name
     region      = var.region
     vpcId       = var.vpc_id
+    # 노드그룹 dedicated taint(system·app) 통과
+    tolerations = [{ key = "dedicated", operator = "Exists", effect = "NoSchedule" }]
     serviceAccount = {
       create = true
       name   = var.service_account_name

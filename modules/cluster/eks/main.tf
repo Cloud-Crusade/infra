@@ -1,5 +1,7 @@
 locals {
   cluster_name = "${var.project_name}-${var.environment}-eks"
+  # 노드그룹 dedicated taint(system·app) 통과 — 시스템 애드온이 어느 노드에도 스케줄되도록
+  addon_tolerations = [{ key = "dedicated", operator = "Exists", effect = "NoSchedule" }]
 }
 
 resource "aws_eks_cluster" "this" {
@@ -124,18 +126,24 @@ resource "aws_eks_addon" "vpc_cni" {
   depends_on = [aws_eks_node_group.this, aws_iam_role_policy_attachment.vpc_cni]
 }
 
+# DaemonSet(모든 taint tolerate) — 버전만 클러스터(1.31) 호환으로 고정
 resource "aws_eks_addon" "kube_proxy" {
   cluster_name  = aws_eks_cluster.this.name
   addon_name    = "kube-proxy"
-  addon_version = "v1.32.0-eksbuild.2"
+  addon_version = "v1.31.14-eksbuild.9"
 
   depends_on = [aws_eks_node_group.this]
 }
 
+# Deployment — dedicated taint 통과 toleration 주입(미주입 시 Pending→DEGRADED). 버전은 toleration 스키마 지원 빌드
 resource "aws_eks_addon" "coredns" {
   cluster_name  = aws_eks_cluster.this.name
   addon_name    = "coredns"
-  addon_version = "v1.11.4-eksbuild.2"
+  addon_version = "v1.11.4-eksbuild.33"
+
+  configuration_values = jsonencode({
+    tolerations = local.addon_tolerations
+  })
 
   depends_on = [aws_eks_node_group.this]
 }
@@ -145,6 +153,11 @@ resource "aws_eks_addon" "ebs_csi_driver" {
   addon_name               = "aws-ebs-csi-driver"
   addon_version            = "v1.38.1-eksbuild.1"
   service_account_role_arn = aws_iam_role.ebs_csi.arn
+
+  # controller(Deployment)만 taint 차단 대상 — node DaemonSet 은 기본 tolerate
+  configuration_values = jsonencode({
+    controller = { tolerations = local.addon_tolerations }
+  })
 
   depends_on = [aws_eks_node_group.this, aws_iam_role_policy_attachment.ebs_csi]
 }
