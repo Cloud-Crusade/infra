@@ -132,11 +132,11 @@ data "aws_iam_policy_document" "reservation_irsa_assume" {
     actions = ["sts:AssumeRoleWithWebIdentity"]
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.eks.arn]
+      identifiers = [var.oidc_provider_arn]
     }
     condition {
       test     = "StringEquals"
-      variable = "${replace(aws_eks_cluster.this.identity[0].oidc[0].issuer, "https://", "")}:sub"
+      variable = "${replace(var.oidc_issuer_url, "https://", "")}:sub"
       values   = ["system:serviceaccount:${local.ticketing_namespace}:ticketing-reservation"]
     }
   }
@@ -161,7 +161,7 @@ resource "aws_iam_role_policy" "reservation_sqs" {
 }
 
 module "ticketing_service" {
-  source   = "./modules/service"
+  source   = "./service"
   for_each = local.svc_db
 
   name      = each.key
