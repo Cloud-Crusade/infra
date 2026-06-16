@@ -471,6 +471,19 @@ module "aws_lb_controller" {
   oidc_provider_url = module.eks.oidc_issuer_url
 }
 
+# Cluster Autoscaler — 관리형 노드그룹(system/app) ASG desired 를 자동 조정(노드 오토스케일링)
+module "cluster_autoscaler" {
+  source = "../../modules/cluster_autoscaler"
+
+  project_name = var.project_name
+  environment  = var.environment
+  cluster_name = module.eks.cluster_name
+  region       = var.aws_region
+
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_provider_url = module.eks.oidc_issuer_url
+}
+
 module "prometheus" {
   source = "../../modules/prometheus"
 
