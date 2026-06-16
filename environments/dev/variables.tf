@@ -299,3 +299,43 @@ variable "ticketing_http_port" {
   type        = number
   default     = 8000
 }
+
+# ===== ops / test_ec2 (테스트 픽스처) =====
+variable "test_image_registry" {
+  description = "ECR 레지스트리 override. 미설정 시 현재 계정·리전에서 파생"
+  type        = string
+  default     = ""
+}
+
+variable "ecr_namespace" {
+  description = "ECR 리포지토리 네임스페이스 prefix (cc/app CD vars.ECR_NAMESPACE 와 동일)"
+  type        = string
+  default     = "ticketing"
+}
+
+variable "test_image_tag" {
+  type    = string
+  default = "latest"
+}
+
+variable "test_service_port" {
+  description = "nginx 게이트웨이 포트 (API Gateway 백엔드). 서비스 직접 포트는 +1..+4"
+  type        = number
+  default     = 8000
+}
+
+variable "test_ec2_instance_type" {
+  type    = string
+  default = "t3.small"
+}
+
+variable "test_ec2_root_volume_gb" {
+  type    = number
+  default = 30
+}
+
+variable "test_service_ingress_cidrs" {
+  description = "서비스 포트 인바운드 허용 CIDR (테스트 편의상 기본 전체 — 운영 금지)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}

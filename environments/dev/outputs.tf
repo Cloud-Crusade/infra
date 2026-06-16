@@ -15,7 +15,7 @@ output "project_name" {
 
 output "bastion_public_ip" {
   description = "Bastion 퍼블릭 IP"
-  value       = aws_instance.bastion.public_ip
+  value       = module.ops.bastion_public_ip
 }
 
 output "www_domain" {

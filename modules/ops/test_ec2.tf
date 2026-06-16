@@ -96,7 +96,7 @@ resource "aws_iam_role_policy" "test_ec2_sqs" {
     Statement = [{
       Effect   = "Allow"
       Action   = ["sqs:SendMessage", "sqs:GetQueueUrl", "sqs:GetQueueAttributes"]
-      Resource = module.async.queue_arn
+      Resource = var.sqs_queue_arn
     }]
   })
 }
@@ -110,7 +110,7 @@ resource "aws_iam_instance_profile" "test_ec2" {
 resource "aws_security_group" "test_ec2" {
   name        = "${var.project_name}-${var.environment}-test-ec2-sg"
   description = "Test EC2 running ECR service image"
-  vpc_id      = module.network.vpc_id
+  vpc_id      = var.vpc_id
 
   # nginx 게이트웨이(8000) + 서비스 직접 디버깅 포트(8001-8004)
   ingress {
@@ -144,9 +144,9 @@ resource "aws_security_group" "test_ec2" {
 resource "aws_instance" "test_service" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = var.test_ec2_instance_type
-  subnet_id                   = module.network.public_subnet_ids[0]
+  subnet_id                   = var.public_subnet_ids[0]
   associate_public_ip_address = true
-  vpc_security_group_ids      = [aws_security_group.test_ec2.id, module.security_groups.eks_sg_id]
+  vpc_security_group_ids      = [aws_security_group.test_ec2.id, var.eks_sg_id]
   iam_instance_profile        = aws_iam_instance_profile.test_ec2.name
   key_name                    = aws_key_pair.bastion.key_name
 
@@ -165,15 +165,15 @@ resource "aws_instance" "test_service" {
     namespace              = var.ecr_namespace
     tag                    = var.test_image_tag
     port                   = var.test_service_port
-    core_writer_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.data.primary_endpoint}/${var.db_name}"
-    core_reader_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.data.primary_replica_endpoint}/${var.db_name}"
-    reservation_writer_url = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.data.reservation_endpoint}/${var.db_name}"
-    reservation_reader_url = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${module.data.reservation_replica_endpoint}/${var.db_name}"
-    redis_url              = "redis://${module.data.main_cache_endpoint}:6379/0"
-    jwt_secret             = random_password.authorization.result
+    core_writer_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${var.rds_primary_endpoint}/${var.db_name}"
+    core_reader_url        = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${var.rds_primary_replica_endpoint}/${var.db_name}"
+    reservation_writer_url = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${var.rds_reservation_endpoint}/${var.db_name}"
+    reservation_reader_url = "postgresql+asyncpg://${var.db_username}:${var.db_password}@${var.rds_reservation_replica_endpoint}/${var.db_name}"
+    redis_url              = "redis://${var.redis_main_endpoint}:6379/0"
+    jwt_secret             = var.jwt_secret
     captcha_enabled        = var.captcha_enabled
-    captcha_hmac_secret    = random_password.captcha_hmac.result
-    sqs_queue_url          = module.async.queue_url
+    captcha_hmac_secret    = var.captcha_hmac_secret
+    sqs_queue_url          = var.sqs_queue_url
   })
 
   tags = {
