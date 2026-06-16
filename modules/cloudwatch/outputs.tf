@@ -24,11 +24,6 @@ output "rds_storage_alarm_arns" {
 
 # ===== Lambda =====
 
-output "lambda_log_group_names" {
-  description = "Lambda log group names"
-  value       = { for k, v in aws_cloudwatch_log_group.lambda : k => v.name }
-}
-
 output "lambda_error_alarm_arns" {
   description = "Lambda error alarm ARNs"
   value       = { for k, v in aws_cloudwatch_metric_alarm.lambda_errors : k => v.arn }

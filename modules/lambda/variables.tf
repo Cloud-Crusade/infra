@@ -82,3 +82,9 @@ variable "layers" {
   description = "모듈명 → Lambda Layer ARN 목록 (예: captcha 의 Secrets 확장 레이어). 없는 모듈은 미부착"
   default     = {}
 }
+
+variable "log_retention_in_days" {
+  type        = number
+  description = "함수 로그 그룹 보관 기간(일)"
+  default     = 14
+}
