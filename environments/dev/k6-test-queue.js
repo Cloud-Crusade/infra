@@ -16,8 +16,8 @@ const CONFIG = {
     AWS_REGION: __ENV.AWS_REGION || '',
     AWS_ACCOUNT_ID: __ENV.AWS_ACCOUNT_ID || '',
     QUEUE_NAME: __ENV.QUEUE_NAME || '',
-    DATABASE_NAME: __ENV.DATABASE_NAME || 'concert_db', 
-    RDS_DSN: __ENV.RDS_DSN || 'postgres://postgres:password@your-rds-endpoint.amazonaws.com:5432/concert_db?sslmode=disable'
+    DATABASE_NAME: __ENV.DATABASE_NAME || '', 
+    RDS_DSN: __ENV.RDS_DSN || ''
 };
 
 // AWS Query API 사양 정렬
