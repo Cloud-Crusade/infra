@@ -22,6 +22,10 @@ on:
         options:
           - eks
           - test_ec2
+      extra_apply_args:
+        description: apply 추가 인자 (targeted/복구용, 예 "-refresh=false -replace=...")
+        type: string
+        default: ""
 
 jobs:
   terraform:
@@ -66,7 +70,7 @@ jobs:
         # 워크플로우 입력으로 백엔드 선택(step env 가 GitHub vars 매핑보다 우선). prod 는 변수 미선언이라 무시
         env:
           TF_VAR_api_backend: ${{ inputs.api_backend }}
-        run: terraform apply -auto-approve -input=false -lock-timeout=5m
+        run: terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}
 
       # destroy 는 ①람다 → ②ENI drain → ③전체 의 staged 단계로 분리.
       # VPC 람다 ENI 가 분리 안 된 채 잔존하면 SG·서브넷 삭제를 DependencyViolation 으로 장시간 막음
