@@ -57,8 +57,16 @@ resource "aws_security_group_rule" "pods_from_nlb" {
 # kubernetes_manifest 는 plan 시 클러스터+CRD(TargetGroupBinding) 접속이 필요하므로
 # enable_nlb_binding 으로 게이팅 — clean-room plan 에선 0개, 컨트롤러 설치 후 2단계 apply 로 활성화.
 # spec.networking 미지정 → 컨트롤러가 SG 를 건드리지 않음(NLB→파드 인바운드는 pods_from_nlb 로 수동 관리).
+# 순서 게이트 — 컨트롤러 출력(role_arn)에 의존. nlb_binding 이 이 게이트에 depends_on 하여
+# destroy 시 컨트롤러보다 먼저 제거되도록(finalizer 교착 방지). shared SG 출력엔 의존 안 해 순환 없음.
+resource "terraform_data" "lb_controller_gate" {
+  input = var.aws_lb_controller_dependency
+}
+
 resource "kubernetes_manifest" "nlb_binding" {
   for_each = var.enable_nlb_binding ? var.service_targets : {}
+
+  depends_on = [terraform_data.lb_controller_gate]
 
   manifest = {
     apiVersion = "elbv2.k8s.aws/v1beta1"

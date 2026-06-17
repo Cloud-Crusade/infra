@@ -22,3 +22,9 @@ output "ticketing_namespace" {
 output "ticketing_http_service_names" {
   value = module.workloads.ticketing_http_service_names
 }
+
+# nlb_binding(shared) 의 순서 의존 핸들 — 컨트롤러 이후 생성·이전 삭제 보장용
+output "aws_lb_controller_role_arn" {
+  description = "ALB 컨트롤러 IRSA Role ARN (소비측 nlb_binding 순서 의존)"
+  value       = module.aws_lb_controller.role_arn
+}
