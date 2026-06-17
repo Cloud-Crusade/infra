@@ -45,10 +45,14 @@ resource "aws_instance" "bastion" {
 
                 # k6 설치
                 dnf install -y https://dl.k6.io/rpm/repo.rpm
-                dnf install -y k6 
+                dnf install -y k6 z
+
+                # k6 플러그인 xk6-sql 설치
+                wget https://github.com/grafana/xk6-sql/releases/download/v1.0.5/xk6-sql_1.0.5_linux_amd64.tar.gz
+                tar -xzf xk6-sql_1.0.5_linux_amd64.tar.gz
 
                 # stress 설치
-                dnf install -y stres
+                dnf install -y stress
           
                 # grafana compose 파일 생성
                 mkdir -p /home/ec2-user/grafana
