@@ -72,7 +72,7 @@ jobs:
           TF_VAR_api_backend: ${{ inputs.api_backend }}
         # dev + eks: 2단계 apply — kubernetes_manifest(nlb_binding)는 클러스터/CRD 존재 후에만 plan 가능.
         # 1단계 바인딩 off 로 클러스터·컨트롤러 생성 → 2단계 바인딩 on 으로 TargetGroupBinding 생성.
-        # test_ec2 는 바인딩 불필요(단일, off). prod 는 enable_nlb_binding 미선언이라 -var 미사용.
+        # test_ec2 는 바인딩 불필요(단일, off). prod 는 enable_nlb_binding 미선언 — TF_VAR_ 는 무시되므로 미전달.
         run: |
           set -e
           COMMON="-auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}"
