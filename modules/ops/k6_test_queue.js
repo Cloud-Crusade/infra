@@ -2,11 +2,11 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import crypto from 'k6/crypto';
 import { Trend } from 'k6/metrics';
-//  [PostgreSQL 플러그인] DB 시스템 뷰 직접 질의를 위한 내장 모듈
+// [PostgreSQL 플러그인] DB 시스템 뷰 직접 질의를 위한 내장 모듈
 import sql from 'k6/x/sql';
 import driver from 'k6/x/sql/driver/postgres'; 
 
-//  [5초 주기 지표] PostgreSQL 엔진이 실제로 5초 동안 처리한 '진짜 실질 초당 트래픽(Real TPS)'
+// [5초 주기 지표] PostgreSQL 엔진이 실제로 처리한 '실질 초당 트래픽(Real TPS)'
 const rdsIntervalRealTPS = new Trend('rds_actual_interval_tps');
 
 // [환경설정] 모든 인프라 및 자격 증명 정보를 환경변수(__ENV)로 안전하게 주입받음
@@ -20,9 +20,17 @@ const CONFIG = {
     RDS_DSN: __ENV.RDS_DSN || ''
 };
 
-// AWS Query API 사양 정렬
+// AWS Query API 사양 정렬 
 CONFIG.SQS_ENDPOINT = `https://sqs.${CONFIG.AWS_REGION}.amazonaws.com/`;
-CONFIG.SQS_QUEUE_URL = `https://sqs.${CONFIG.AWS_REGION}.amazonaws.com/${CONFIG.CONFIG.AWS_ACCOUNT_ID}/${CONFIG.QUEUE_NAME}`;
+CONFIG.SQS_QUEUE_URL = `https://sqs.${CONFIG.AWS_REGION}.amazonaws.com/${CONFIG.AWS_ACCOUNT_ID}/${CONFIG.QUEUE_NAME}`;
+
+// [Mock 데이터 사양] 식별이 용이하도록 TEST- 접두사 일괄 적용
+const MOCK_DATA = {
+    CONCERT_ID: 'TEST-CONCERT-2026',
+    USER_PREFIX: 'TEST-USER',
+    RESERVATION_PREFIX: 'TEST-REV',
+    GROUP_PREFIX: 'TEST-GROUP'
+};
 
 export const options = {
     scenarios: {
@@ -84,7 +92,7 @@ function signSqsFormRequest(payload, region, accessKey, secretKey) {
     };
 }
 
-// 5초 주기 실시간 중계 연산을 위한 공유 상태 변수 초기화
+// VU별 격리 환경 타이머 변수 초기화
 let lastCheckedTime = Date.now();
 let lastCheckedCount = 0;
 
@@ -112,19 +120,23 @@ export function setup() {
 }
 
 // 2. [부하 단계] SQS 타격 진행 및 1번 유저 격리 기반 5초 주기 DB 통계 수집
-export default function () {
+export default function (setupData) {
     let formData = `Action=SendMessageBatch&QueueUrl=${awsAws4Encode(CONFIG.SQS_QUEUE_URL)}&Version=2012-11-05`;
     
     for (let i = 0; i < 10; i++) {
-        const uniqueId = `resv_${__VU}_${__ITER}_${i}_${Date.now()}`;
+        const timestamp = Date.now();
+        const uniqueId = `resv_${__VU}_${__ITER}_${i}_${timestamp}`;
         const index = i + 1;
+        
+        // 요구사항 반영: 식별하기 편하도록 TEST- 접두사를 명시한 구조로 바디 조립
         const messageBody = JSON.stringify({ 
-            reservation_id: `REV-${Date.now()}-${__VU}-${__ITER}-${i}`, 
-            user_id: `user_${__VU}_${i}`,
-            concert_id: 'concert-2026',
-            timestamp: Date.now()
+            reservation_id: `${MOCK_DATA.RESERVATION_PREFIX}-${timestamp}-${__VU}-${__ITER}-${i}`, 
+            user_id: `${MOCK_DATA.USER_PREFIX}-${__VU}-${i}`,
+            concert_id: MOCK_DATA.CONCERT_ID,
+            timestamp: timestamp
         });
-        formData += `&SendMessageBatchRequestEntry.${index}.Id=${uniqueId}&SendMessageBatchRequestEntry.${index}.MessageBody=${awsAws4Encode(messageBody)}&SendMessageBatchRequestEntry.${index}.MessageGroupId=group_vu_${__VU}_${i}&SendMessageBatchRequestEntry.${index}.MessageDeduplicationId=${uniqueId}`;
+        
+        formData += `&SendMessageBatchRequestEntry.${index}.Id=${uniqueId}&SendMessageBatchRequestEntry.${index}.MessageBody=${awsAws4Encode(messageBody)}&SendMessageBatchRequestEntry.${index}.MessageGroupId=${MOCK_DATA.GROUP_PREFIX}-VU-${__VU}-${i}&SendMessageBatchRequestEntry.${index}.MessageDeduplicationId=${uniqueId}`;
     }
 
     const headers = signSqsFormRequest(formData, CONFIG.AWS_REGION, CONFIG.AWS_ACCESS_KEY_ID, CONFIG.AWS_SECRET_ACCESS_KEY);
@@ -135,7 +147,7 @@ export default function () {
     // -------------------------------------------------------------------------
     // [격리 제어] 5초에 한 번만 실행되는 백그라운드 RDS 실측 트래픽 연산 레이어
     // -------------------------------------------------------------------------
-    // 수많은 가상 유저들 중 딱 1번 유저(__VU === 1)만 5초 주기를 계산하여 가볍게 전담 조회
+    // 가상 유저 1번(__VU === 1)이 5초 주기를 계산하여 안정적으로 조회 전담
     if (__VU === 1 && Date.now() - lastCheckedTime >= 5000) {
         const currentTime = Date.now();
         const durationSeconds = (currentTime - lastCheckedTime) / 1000;
@@ -149,18 +161,21 @@ export default function () {
             for (const row of rows) { currentWriteCount = parseInt(row.tup_inserted, 10); }
             db.close();
 
+            // VU 1번이 처음 기동되었을 때는 직전 카운트가 없으므로 최초 백업만 진행 (오차 방지)
             if (lastCheckedCount === 0) {
                 lastCheckedCount = currentWriteCount; 
             } else {
                 const intervalInserts = currentWriteCount - lastCheckedCount;
-                const intervalTPS = intervalInserts / durationSeconds;
-
-                // 5초 주기 실측 TPS 데이터를 k6 시계열 스트림에 주입
-                rdsIntervalRealTPS.add(intervalTPS);
+                
+                // 시간 분모가 정상적일 때만 트렌드 스트림에 연산값 주입
+                if (durationSeconds > 0) {
+                    const intervalTPS = intervalInserts / durationSeconds;
+                    rdsIntervalRealTPS.add(intervalTPS);
+                }
                 lastCheckedCount = currentWriteCount;
             }
         } catch (err) {
-            // DB 네트워크 지연 등 돌발 변수 시 테스트가 멈추지 않도록 예외 차단 안전장치
+            // DB 통신 장애 발생 시 전체 부하 테스트가 터지지 않도록 예외 차단
         }
         lastCheckedTime = currentTime;
     }
