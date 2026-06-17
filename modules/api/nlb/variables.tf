@@ -50,8 +50,15 @@ variable "enable_deletion_protection" {
   default     = false
 }
 
-variable "enable_zonal_shift" {
-  description = "가용 영역 전환(Zonal Shift) 활성화 여부"
+# cross-zone 과 zonal shift 는 AWS 상 상호 배타 — 둘 중 하나만 true (main.tf precondition 으로 강제)
+variable "enable_cross_zone_load_balancing" {
+  description = "NLB cross-zone 로드밸런싱. 타겟이 단일 AZ 에 몰려도 모든 AZ 노드가 라우팅(블랙홀 방지). zonal shift 와 동시 사용 불가"
   type        = bool
   default     = true
+}
+
+variable "enable_zonal_shift" {
+  description = "NLB Zonal Shift(AZ 격리 전환). cross-zone 과 동시 사용 불가"
+  type        = bool
+  default     = false
 }
