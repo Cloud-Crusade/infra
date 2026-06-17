@@ -50,6 +50,13 @@ variable "enable_deletion_protection" {
   default     = false
 }
 
+# REST VPC Link 트래픽은 VPC CIDR 밖에서 유입 → 기본 0.0.0.0/0. NLB 는 internal 이라 인터넷 비노출
+variable "listener_ingress_cidrs" {
+  description = "NLB 리스너 인바운드 허용 CIDR (API GW VPC Link 는 VPC CIDR 밖 PrivateLink IP 라 기본 전체 허용; internal NLB)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
 # cross-zone 과 zonal shift 는 AWS 상 상호 배타 — 둘 중 하나만 true (main.tf precondition 으로 강제)
 variable "enable_cross_zone_load_balancing" {
   description = "NLB cross-zone 로드밸런싱. 타겟이 단일 AZ 에 몰려도 모든 AZ 노드가 라우팅(블랙홀 방지). zonal shift 와 동시 사용 불가"
