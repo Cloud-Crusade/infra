@@ -43,8 +43,8 @@ resource "aws_security_group_rule" "nlb_listener_ingress" {
   from_port         = each.value.listener_port
   to_port           = each.value.listener_port
   protocol          = "tcp"
-  cidr_blocks       = [var.vpc_cidr]
-  description       = "${each.key} listener from VPC (API GW VPC Link)"
+  cidr_blocks       = var.listener_ingress_cidrs
+  description       = "${each.key} listener (API GW VPC Link / VPC)"
 }
 
 resource "aws_security_group_rule" "nlb_target_egress" {
