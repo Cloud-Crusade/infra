@@ -43,17 +43,17 @@ resource "aws_instance" "bastion" {
                 curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
                 chmod +x /usr/libexec/docker/cli-plugins/docker-compose
 
-                # k6 설치
-                dnf install -y https://dl.k6.io/rpm/repo.rpm
-                dnf install -y k6 z
+                # k6(+xk6-sql) compose 구성 — bastion 직접 설치(dnf/xk6) 대신 컨테이너로 실행
+                mkdir -p /home/ec2-user/k6/scripts
+                cat > /home/ec2-user/k6/docker-compose.yml <<'K6COMPOSE'
+                ${file("${path.module}/compose/k6/docker-compose.yml")}
+                K6COMPOSE
+                cat > /home/ec2-user/k6/Dockerfile <<'K6DOCKERFILE'
+                ${file("${path.module}/compose/k6/Dockerfile")}
+                K6DOCKERFILE
+                # xk6-sql 커스텀 k6 이미지 사전 빌드(최초 1회, 실패해도 부팅 계속)
+                cd /home/ec2-user/k6 && docker compose build k6-sql || true
 
-                # k6 플러그인 xk6-sql 설치
-                wget https://github.com/grafana/xk6-sql/releases/download/v1.0.5/xk6-sql_1.0.5_linux_amd64.tar.gz
-                tar -xzf xk6-sql_1.0.5_linux_amd64.tar.gz
-
-                # stress 설치
-                dnf install -y stress
-          
                 # grafana compose 파일 생성
                 mkdir -p /home/ec2-user/grafana
                 cat > /home/ec2-user/grafana/docker-compose.yml <<'COMPOSE'
