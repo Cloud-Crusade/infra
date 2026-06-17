@@ -45,8 +45,7 @@ resource "kubernetes_config_map_v1" "ticketing_config" {
     namespace = local.ticketing_namespace
   }
   data = {
-    # 클러스터에선 스키마를 alembic 이 소유(앱 자동 create_all 비활성) + JSON 로그(Fluent Bit→CloudWatch)
-    ENV        = "production"
+    ENV        = "development"
     AWS_REGION = var.aws_region
 
     REDIS_URL                           = "redis://redis-main:6379/0"
@@ -185,5 +184,5 @@ module "ticketing_service" {
 
   irsa_role_arn = each.key == "reservation" ? aws_iam_role.reservation_irsa.arn : ""
 
-  depends_on = [kubernetes_job_v1.migrate]
+  depends_on = [kubernetes_job_v1.db_bootstrap]
 }
