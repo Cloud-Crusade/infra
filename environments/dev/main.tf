@@ -234,6 +234,10 @@ module "api" {
 module "shared" {
   source = "../../modules/shared"
 
+  # cluster 전체(특히 aws_lb_controller) 이후 생성·이전 삭제 보장.
+  # destroy 시 nlb_binding(TargetGroupBinding) 이 컨트롤러보다 먼저 제거돼야 finalizer 교착 회피.
+  depends_on = [module.cluster]
+
   project_name = var.project_name
   environment  = var.environment
   alarm_email  = var.alarm_email
