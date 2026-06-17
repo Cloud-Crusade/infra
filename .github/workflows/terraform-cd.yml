@@ -70,7 +70,26 @@ jobs:
         # 워크플로우 입력으로 백엔드 선택(step env 가 GitHub vars 매핑보다 우선). prod 는 변수 미선언이라 무시
         env:
           TF_VAR_api_backend: ${{ inputs.api_backend }}
-        run: terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}
+        # dev + eks: 2단계 apply — kubernetes_manifest(nlb_binding)는 클러스터/CRD 존재 후에만 plan 가능.
+        # 1단계 바인딩 off 로 클러스터·컨트롤러 생성 → 2단계 바인딩 on 으로 TargetGroupBinding 생성.
+        # test_ec2 는 바인딩 불필요(단일, off). prod 는 enable_nlb_binding 미선언이라 -var 미사용.
+        run: |
+          set -e
+          COMMON="-auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}"
+          if [ "${{ inputs.environment }}" = "dev" ] && [ "${{ inputs.api_backend }}" = "eks" ]; then
+            echo "::group::Stage 1/2 — enable_nlb_binding=false (클러스터·컨트롤러 생성)"
+            terraform apply $COMMON -var=enable_nlb_binding=false
+            echo "::endgroup::"
+            echo "::group::Stage 2/2 — enable_nlb_binding=true (TargetGroupBinding 생성)"
+            terraform apply $COMMON -var=enable_nlb_binding=true
+            echo "::endgroup::"
+          elif [ "${{ inputs.environment }}" = "dev" ]; then
+            echo "dev/test_ec2 — 단일 apply (NLB 바인딩 비활성)"
+            terraform apply $COMMON -var=enable_nlb_binding=false
+          else
+            echo "${{ inputs.environment }} — 단일 apply"
+            terraform apply $COMMON
+          fi
 
       # destroy 는 ①람다 → ②ENI drain → ③전체 의 staged 단계로 분리.
       # VPC 람다 ENI 가 분리 안 된 채 잔존하면 SG·서브넷 삭제를 DependencyViolation 으로 장시간 막음
