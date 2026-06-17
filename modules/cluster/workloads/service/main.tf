@@ -13,6 +13,8 @@ resource "kubernetes_service_account_v1" "this" {
 }
 
 resource "kubernetes_deployment_v1" "this" {
+  wait_for_rollout = false
+
   metadata {
     name      = "ticketing-${var.name}"
     namespace = var.namespace
