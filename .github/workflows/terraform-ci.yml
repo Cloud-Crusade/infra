@@ -63,4 +63,4 @@ jobs:
         working-directory: environments/${{ matrix.environment }}
         env:
           TF_VAR_enable_nlb_binding: "false"
-        run: terraform plan -input=false -no-color -var=enable_nlb_binding=false
+        run: terraform plan -input=false -no-color
