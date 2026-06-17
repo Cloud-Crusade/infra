@@ -52,6 +52,9 @@ resource "helm_release" "this" {
     clusterName = var.cluster_name
     region      = var.region
     vpcId       = var.vpc_id
+    # NLB 연결은 type:LoadBalancer 가 아닌 TargetGroupBinding(module.shared.nlb_binding) 으로 처리 →
+    # Service mutator 웹훅 불필요. 비활성화로 모든 v1 Service 생성이 컨트롤러 파드 Ready 에 묶이는 레이스 제거.
+    enableServiceMutatorWebhook = false
     # 노드그룹 dedicated taint(system·app) 통과
     tolerations = [{ key = "dedicated", operator = "Exists", effect = "NoSchedule" }]
     serviceAccount = {
