@@ -63,6 +63,12 @@ resource "kubernetes_config_map_v1" "db_bootstrap_sql" {
       ALTER ROLE :"role" WITH PASSWORD :'pw';
       GRANT CONNECT ON DATABASE :"db" TO :"role";
       GRANT USAGE, CREATE ON SCHEMA public TO :"role";
+      -- 테이블 소유자가 master 라 서비스 롤에 명시 GRANT 필요. 기존 테이블 + 시퀀스
+      GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO :"role";
+      GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO :"role";
+      -- 이후 master 가 만드는 테이블/시퀀스도 자동 부여(마이그레이션이 master 로 실행되는 경우)
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO :"role";
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO :"role";
     SQL
     "run.sh"   = <<-SH
       #!/bin/sh
