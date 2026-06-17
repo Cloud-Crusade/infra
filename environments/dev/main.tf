@@ -234,9 +234,9 @@ module "api" {
 module "shared" {
   source = "../../modules/shared"
 
-  # cluster 전체(특히 aws_lb_controller) 이후 생성·이전 삭제 보장.
-  # destroy 시 nlb_binding(TargetGroupBinding) 이 컨트롤러보다 먼저 제거돼야 finalizer 교착 회피.
-  depends_on = [module.cluster]
+  # nlb_binding 이 컨트롤러 이후 생성·이전 삭제되도록 순서 핸들 주입(destroy 시 finalizer 교착 방지).
+  # 모듈 전체 depends_on 은 cluster↔shared(SG) 순환을 유발하므로, 핸들만 thread 해 nlb_binding 에만 의존.
+  aws_lb_controller_dependency = module.cluster.aws_lb_controller_role_arn
 
   project_name = var.project_name
   environment  = var.environment

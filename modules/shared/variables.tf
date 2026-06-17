@@ -115,3 +115,10 @@ variable "ticketing_http_service_names" {
   type        = map(string)
   default     = {}
 }
+
+# 컨트롤러 준비 핸들 — nlb_binding 의 생성/삭제 순서 의존(컨트롤러 후 생성, 이전 삭제). 값 자체는 미사용
+variable "aws_lb_controller_dependency" {
+  description = "ALB 컨트롤러 순서 의존 핸들(role_arn). nlb_binding 이 컨트롤러보다 먼저 삭제되도록"
+  type        = string
+  default     = ""
+}
