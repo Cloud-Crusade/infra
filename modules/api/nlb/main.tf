@@ -7,13 +7,19 @@ resource "aws_lb" "this" {
 
   enable_deletion_protection = var.enable_deletion_protection
 
-  # 타겟(파드)이 단일 AZ 에 몰려도 모든 AZ 노드가 라우팅 — 타겟 없는 AZ 노드의 트래픽 블랙홀(API GW 500) 방지
-  enable_cross_zone_load_balancing = true
-
-  enable_zonal_shift = var.enable_zonal_shift
+  # cross-zone 과 zonal shift 는 AWS 상 상호 배타 — 둘 다 true 면 apply 거부(아래 precondition 으로 선검출)
+  enable_cross_zone_load_balancing = var.enable_cross_zone_load_balancing
+  enable_zonal_shift               = var.enable_zonal_shift
 
   tags = {
     Environment = var.environment
+  }
+
+  lifecycle {
+    precondition {
+      condition     = !(var.enable_cross_zone_load_balancing && var.enable_zonal_shift)
+      error_message = "cross-zone 로드밸런싱과 zonal shift 는 동시 활성화할 수 없습니다 (AWS 제약). 하나만 true 로 설정하세요."
+    }
   }
 }
 
