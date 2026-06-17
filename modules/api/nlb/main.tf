@@ -7,6 +7,9 @@ resource "aws_lb" "this" {
 
   enable_deletion_protection = var.enable_deletion_protection
 
+  # 타겟(파드)이 단일 AZ 에 몰려도 모든 AZ 노드가 라우팅 — 타겟 없는 AZ 노드의 트래픽 블랙홀(API GW 500) 방지
+  enable_cross_zone_load_balancing = true
+
   enable_zonal_shift = var.enable_zonal_shift
 
   tags = {
