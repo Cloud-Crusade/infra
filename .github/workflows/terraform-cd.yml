@@ -78,14 +78,14 @@ jobs:
           COMMON="-auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}"
           if [ "${{ inputs.environment }}" = "dev" ] && [ "${{ inputs.api_backend }}" = "eks" ]; then
             echo "::group::Stage 1/2 — enable_nlb_binding=false (클러스터·컨트롤러 생성)"
-            terraform apply $COMMON -var=enable_nlb_binding=false
+            TF_VAR_enable_nlb_binding=false terraform apply $COMMON
             echo "::endgroup::"
             echo "::group::Stage 2/2 — enable_nlb_binding=true (TargetGroupBinding 생성)"
-            terraform apply $COMMON -var=enable_nlb_binding=true
+            TF_VAR_enable_nlb_binding=true terraform apply $COMMON
             echo "::endgroup::"
           elif [ "${{ inputs.environment }}" = "dev" ]; then
             echo "dev/test_ec2 — 단일 apply (NLB 바인딩 비활성)"
-            terraform apply $COMMON -var=enable_nlb_binding=false
+            TF_VAR_enable_nlb_binding=false terraform apply $COMMON
           else
             echo "${{ inputs.environment }} — 단일 apply"
             terraform apply $COMMON
