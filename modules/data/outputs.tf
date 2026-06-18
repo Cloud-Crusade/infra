@@ -15,6 +15,13 @@ output "reservation_replica_endpoint" {
   value = module.rds.reservation_replica_endpoint
 }
 
+# 서비스 DB 롤 비밀번호 (cluster 의 앱 DB URL·bootstrap 용). 프록시 auth 에 등록된 시크릿과 동일 값
+output "svc_role_passwords" {
+  description = "서비스 DB 롤(auth_svc 등)별 비밀번호"
+  sensitive   = true
+  value       = { for r in keys(local.svc_role_proxy) : r => random_password.svc_role[r].result }
+}
+
 # ================== rds_proxy ==================
 output "core_proxy_endpoint" {
   description = "Core DB Proxy 엔드포인트 — Multi-AZ Failover 시 연결 단절 최소화"

@@ -136,9 +136,10 @@ module "cluster" {
   jwt_secret          = random_password.authorization.result
   captcha_hmac_secret = random_password.captcha_hmac.result
 
-  db_name     = var.db_name
-  db_username = var.db_username
-  db_password = var.db_password
+  db_name            = var.db_name
+  db_username        = var.db_username
+  db_password        = var.db_password
+  svc_role_passwords = module.data.svc_role_passwords
 }
 
 module "data" {

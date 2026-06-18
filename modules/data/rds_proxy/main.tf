@@ -21,7 +21,7 @@ resource "aws_iam_role_policy" "proxy_secrets" {
     Statement = [{
       Effect   = "Allow"
       Action   = "secretsmanager:GetSecretValue"
-      Resource = var.db_secret_arn
+      Resource = concat([var.db_secret_arn], var.core_role_secret_arns, var.reservation_role_secret_arns)
     }]
   })
 }
@@ -43,6 +43,16 @@ resource "aws_db_proxy" "core" {
     auth_scheme = "SECRETS"
     secret_arn  = var.db_secret_arn
     iam_auth    = "DISABLED"
+  }
+
+  # 서비스 롤 자격증명 — 앱이 롤(auth_svc/event_svc)로 프록시 경유 접속
+  dynamic "auth" {
+    for_each = var.core_role_secret_arns
+    content {
+      auth_scheme = "SECRETS"
+      secret_arn  = auth.value
+      iam_auth    = "DISABLED"
+    }
   }
 
   tags = {
@@ -82,6 +92,16 @@ resource "aws_db_proxy" "reservation" {
     auth_scheme = "SECRETS"
     secret_arn  = var.db_secret_arn
     iam_auth    = "DISABLED"
+  }
+
+  # 서비스 롤 자격증명 — 앱이 롤(reservation_svc/payment_svc)로 프록시 경유 접속
+  dynamic "auth" {
+    for_each = var.reservation_role_secret_arns
+    content {
+      auth_scheme = "SECRETS"
+      secret_arn  = auth.value
+      iam_auth    = "DISABLED"
+    }
   }
 
   tags = {

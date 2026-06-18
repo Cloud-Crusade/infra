@@ -105,3 +105,9 @@ variable "db_password" {
   type      = string
   sensitive = true
 }
+
+variable "svc_role_passwords" {
+  description = "서비스 DB 롤(auth_svc 등)별 비밀번호 (data 레이어 생성, 프록시 auth 와 동일)"
+  type        = map(string)
+  sensitive   = true
+}

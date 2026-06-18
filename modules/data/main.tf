@@ -26,6 +26,10 @@ module "rds_proxy" {
   db_secret_arn             = module.secrets_manager.rds_credentials_secret_arn
   core_db_identifier        = module.rds.primary_identifier
   reservation_db_identifier = module.rds.reservation_identifier
+
+  # 서비스 롤 시크릿을 프록시 auth 에 등록 (core←auth/event, reservation←reservation/payment)
+  core_role_secret_arns        = [for r, p in local.svc_role_proxy : aws_secretsmanager_secret.svc_role[r].arn if p == "core"]
+  reservation_role_secret_arns = [for r, p in local.svc_role_proxy : aws_secretsmanager_secret.svc_role[r].arn if p == "reservation"]
 }
 
 module "elasticache" {
