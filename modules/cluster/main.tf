@@ -105,5 +105,6 @@ module "prometheus" {
   project_name = var.project_name
   environment  = var.environment
 
-  eks_cluster_name = ""
+  # 게이트 해제 — Prometheus(+node_exporter DaemonSet) 각 노드 자동 배포
+  eks_cluster_name = module.eks.cluster_name
 }
