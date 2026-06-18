@@ -15,6 +15,10 @@ module "cloudwatch" {
   # EKS/APIGW 알람은 "" 게이팅으로 미활성(활성화는 별도 PR — 리소스 추가)
   eks_cluster_name = var.eks_cluster_name
   api_gateway_name = var.api_gateway_name
+
+  # ARC zonal-shift outcome 알람 dimension(NLB suffix)
+  lb_arn_suffix             = var.lb_arn_suffix
+  target_group_arn_suffixes = var.target_group_arn_suffixes
 }
 
 # 도메인 SG 객체 — eks/rds/cache/lambda/bastion. network 에만 의존(도메인 출력 비참조) → 도메인이 선행 소비

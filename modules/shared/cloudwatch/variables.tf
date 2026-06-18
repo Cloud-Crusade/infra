@@ -73,3 +73,13 @@ variable "api_gateway_name" {
   type        = string
   default     = ""
 }
+
+variable "lb_arn_suffix" {
+  description = "NLB ARN suffix for CloudWatch dimensions"
+  type        = string
+}
+
+variable "target_group_arn_suffixes" {
+  description = "서비스명 → 타겟그룹 ARN suffix (ARC outcome 알람 dimension용, 전체 TG 집계)"
+  type        = map(string)
+}

@@ -36,34 +36,11 @@ resource "aws_instance" "bastion" {
     Name = "${var.project_name}-${var.environment}-bastion"
   }
 
-  user_data = <<-EOF
-                #!/bin/bash
-                # docker compsoe 설치
-                mkdir -p /usr/libexec/docker/cli-plugins/
-                curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
-                chmod +x /usr/libexec/docker/cli-plugins/docker-compose
-
-                # k6(+xk6-sql) compose 구성 — bastion 직접 설치(dnf/xk6) 대신 컨테이너로 실행
-                mkdir -p /home/ec2-user/k6/scripts
-                cat > /home/ec2-user/k6/docker-compose.yml <<'K6COMPOSE'
-                ${file("${path.module}/compose/k6/docker-compose.yml")}
-                K6COMPOSE
-                cat > /home/ec2-user/k6/Dockerfile <<'K6DOCKERFILE'
-                ${file("${path.module}/compose/k6/Dockerfile")}
-                K6DOCKERFILE
-                # xk6-sql 커스텀 k6 이미지 사전 빌드(최초 1회, 실패해도 부팅 계속)
-                cd /home/ec2-user/k6 && docker compose build k6-sql || true
-
-                # grafana compose 파일 생성
-                mkdir -p /home/ec2-user/grafana
-                cat > /home/ec2-user/grafana/docker-compose.yml <<'COMPOSE'
-                ${file("${path.module}/compose/grafana/docker-compose.yml")}
-                COMPOSE
-
-                # grafana 실행
-                cd /home/ec2-user/grafana
-                docker compose up -d
-                EOF
+  # scripts/ · compose/ 전체 파일을 인라인 배치(부팅 시). fileset 으로 자동 포함.
+  # gzip 압축(base64) — user_data 16KB 제한 회피(cloud-init 가 자동 해제). 더 커지면 S3 sync 로 전환.
+  user_data_base64 = base64gzip(templatefile("${path.module}/templates/bastion_user_data.sh.tftpl", {
+    ops_files = { for f in fileset(path.module, "{scripts,compose}/**") : f => filebase64("${path.module}/${f}") }
+  }))
 }
 
 # bastion 개인키를 backend(state) 와 동일한 S3 버킷에 업로드 (팀 SSH 접근용)
