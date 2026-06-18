@@ -12,12 +12,7 @@ locals {
   ticketing_images = { for k in keys(local.svc_db) : k => "${var.ecr_registry}/${var.ecr_namespace}/${k}:${var.ticketing_image_tag}" }
 }
 
-# asyncpg URL 파싱 안정성 위해 special=false
-resource "random_password" "db_role" {
-  for_each = local.svc_db
-  length   = 32
-  special  = false
-}
+# 롤 비밀번호는 data 레이어에서 생성·프록시 auth 에 등록됨 → 여기선 주입받아 사용(var.svc_role_passwords)
 
 # 서비스별 DB 크리덴셜(자기 롤). 호스트는 고정 DNS(ExternalName) → 컷오버 시 URL 불변
 resource "kubernetes_secret_v1" "ticketing_db" {
@@ -27,8 +22,8 @@ resource "kubernetes_secret_v1" "ticketing_db" {
     namespace = local.ticketing_namespace
   }
   data = {
-    DB_WRITER_URL = "postgresql+asyncpg://${each.value.role}:${random_password.db_role[each.key].result}@${each.value.writer}:5432/${var.db_name}"
-    DB_READER_URL = "postgresql+asyncpg://${each.value.role}:${random_password.db_role[each.key].result}@${each.value.reader}:5432/${var.db_name}"
+    DB_WRITER_URL = "postgresql+asyncpg://${each.value.role}:${var.svc_role_passwords[each.value.role]}@${each.value.writer}:5432/${var.db_name}"
+    DB_READER_URL = "postgresql+asyncpg://${each.value.role}:${var.svc_role_passwords[each.value.role]}@${each.value.reader}:5432/${var.db_name}"
   }
   depends_on = [kubernetes_namespace_v1.ticketing]
 }
@@ -43,10 +38,10 @@ resource "kubernetes_secret_v1" "db_bootstrap" {
     MASTER_USER     = var.db_username
     MASTER_PASSWORD = var.db_password
     DB_NAME         = var.db_name
-    AUTH_PW         = random_password.db_role["auth"].result
-    EVENT_PW        = random_password.db_role["event"].result
-    RESERVATION_PW  = random_password.db_role["reservation"].result
-    PAYMENT_PW      = random_password.db_role["payment"].result
+    AUTH_PW         = var.svc_role_passwords["auth_svc"]
+    EVENT_PW        = var.svc_role_passwords["event_svc"]
+    RESERVATION_PW  = var.svc_role_passwords["reservation_svc"]
+    PAYMENT_PW      = var.svc_role_passwords["payment_svc"]
   }
   depends_on = [kubernetes_namespace_v1.ticketing]
 }

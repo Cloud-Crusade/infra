@@ -57,9 +57,10 @@ module "workloads" {
   jwt_secret          = var.jwt_secret
   captcha_hmac_secret = var.captcha_hmac_secret
 
-  db_name     = var.db_name
-  db_username = var.db_username
-  db_password = var.db_password
+  db_name            = var.db_name
+  db_username        = var.db_username
+  db_password        = var.db_password
+  svc_role_passwords = var.svc_role_passwords
 
   # 노드그룹 준비 후 워크로드 스케줄(부트스트랩·마이그레이션 Job)
   depends_on = [module.eks]

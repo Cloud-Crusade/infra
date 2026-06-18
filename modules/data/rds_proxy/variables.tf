@@ -32,3 +32,15 @@ variable "reservation_db_identifier" {
   description = "Reservation RDS 인스턴스 identifier"
   type        = string
 }
+
+variable "core_role_secret_arns" {
+  description = "core 프록시 auth 에 등록할 서비스 롤 시크릿 ARN 목록"
+  type        = list(string)
+  default     = []
+}
+
+variable "reservation_role_secret_arns" {
+  description = "reservation 프록시 auth 에 등록할 서비스 롤 시크릿 ARN 목록"
+  type        = list(string)
+  default     = []
+}
