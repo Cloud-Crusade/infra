@@ -36,10 +36,11 @@ resource "aws_instance" "bastion" {
     Name = "${var.project_name}-${var.environment}-bastion"
   }
 
-  # scripts/ · compose/ 전체 파일을 base64 인라인으로 bastion 에 배치(부팅 시). fileset 으로 자동 포함.
-  user_data = templatefile("${path.module}/templates/bastion_user_data.sh.tftpl", {
+  # scripts/ · compose/ 전체 파일을 인라인 배치(부팅 시). fileset 으로 자동 포함.
+  # gzip 압축(base64) — user_data 16KB 제한 회피(cloud-init 가 자동 해제). 더 커지면 S3 sync 로 전환.
+  user_data_base64 = base64gzip(templatefile("${path.module}/templates/bastion_user_data.sh.tftpl", {
     ops_files = { for f in fileset(path.module, "{scripts,compose}/**") : f => filebase64("${path.module}/${f}") }
-  })
+  }))
 }
 
 # bastion 개인키를 backend(state) 와 동일한 S3 버킷에 업로드 (팀 SSH 접근용)
