@@ -14,6 +14,19 @@ module "rds" {
   subnet_ids             = var.subnet_ids
 }
 
+module "rds_proxy" {
+  source = "./rds_proxy"
+
+  project_name = var.project_name
+  environment  = var.environment
+  proxy_sg_id  = var.rds_proxy_sg_id
+  subnet_ids   = var.subnet_ids
+
+  db_secret_arn             = module.secrets_manager.rds_credentials_secret_arn
+  core_db_identifier        = module.rds.primary_identifier
+  reservation_db_identifier = module.rds.reservation_identifier
+}
+
 module "elasticache" {
   source            = "./elasticache"
   subnet_group_name = "${var.project_name}-${var.environment}-cache"
@@ -56,7 +69,7 @@ module "secrets_manager" {
   reservation_private_key_value = var.reservation_private_key_value
   rds_username                  = var.db_username
   rds_password                  = var.db_password
-  core_writer_endpoint          = module.rds.primary_endpoint
-  reservation_writer_endpoint   = module.rds.reservation_endpoint
+  core_writer_endpoint          = module.rds_proxy.core_proxy_endpoint
+  reservation_writer_endpoint   = module.rds_proxy.reservation_proxy_endpoint
   captcha_hmac_secret_value     = var.captcha_hmac_secret_value
 }

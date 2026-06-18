@@ -15,6 +15,10 @@ output "rds_sg_id" {
   value = module.security_group.rds_sg_id
 }
 
+output "rds_proxy_sg_id" {
+  value = module.security_group.rds_proxy_sg_id
+}
+
 output "cache_sg_id" {
   value = module.security_group.cache_sg_id
 }
