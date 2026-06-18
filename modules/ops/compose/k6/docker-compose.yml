@@ -9,12 +9,14 @@ services:
     working_dir: /scripts
     volumes:
       - ../../scripts:/scripts
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       BASE_URL: ${BASE_URL:-}
       EVENT_ID: ${EVENT_ID:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
       # Prometheus remote-write 출력(--out experimental-prometheus-rw). 예: http://<prometheus>/api/v1/write
-      K6_PROMETHEUS_RW_SERVER_URL: ${K6_PROMETHEUS_RW_SERVER_URL:-}
+      K6_PROMETHEUS_RW_SERVER_URL: ${K6_PROMETHEUS_RW_SERVER_URL:-http://host.docker.internal:9090/api/v1/write}
 
   # xk6-sql(PostgreSQL) 포함 커스텀 k6 — DB 직접 질의 테스트용. Dockerfile 로 빌드.
   k6-sql:
@@ -24,8 +26,10 @@ services:
     working_dir: /scripts
     volumes:
       - ../../scripts:/scripts
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       BASE_URL: ${BASE_URL:-}
       EVENT_ID: ${EVENT_ID:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
-      K6_PROMETHEUS_RW_SERVER_URL: ${K6_PROMETHEUS_RW_SERVER_URL:-}
+      K6_PROMETHEUS_RW_SERVER_URL: ${K6_PROMETHEUS_RW_SERVER_URL:-http://host.docker.internal:9090/api/v1/write}
