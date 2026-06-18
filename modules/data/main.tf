@@ -69,7 +69,7 @@ module "secrets_manager" {
   reservation_private_key_value = var.reservation_private_key_value
   rds_username                  = var.db_username
   rds_password                  = var.db_password
-  core_writer_endpoint          = module.rds.primary_endpoint
-  reservation_writer_endpoint   = module.rds.reservation_endpoint
+  core_writer_endpoint          = module.rds_proxy.core_proxy_endpoint
+  reservation_writer_endpoint   = module.rds_proxy.reservation_proxy_endpoint
   captcha_hmac_secret_value     = var.captcha_hmac_secret_value
 }
