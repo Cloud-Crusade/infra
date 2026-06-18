@@ -1,5 +1,5 @@
 # k6 부하테스트 — bastion 에 직접 설치(dnf/xk6) 대신 컨테이너로 실행(grafana 와 동일 패턴).
-# 스크립트는 ./scripts 에 두고 실행: docker compose run --rm k6 run /scripts/<file>.js
+# 스크립트는 ops/scripts/ 에 두고(compose 기준 ../../scripts) 실행: docker compose run --rm k6 run /scripts/<file>.js
 # 메트릭을 Prometheus 로 보내려면: docker compose run --rm k6 run --out experimental-prometheus-rw /scripts/<file>.js
 # (K6_PROMETHEUS_RW_SERVER_URL 필요). profiles=manual 이라 `up` 으로 상주하지 않고 `run` 으로 1회 실행한다.
 services:
@@ -8,7 +8,7 @@ services:
     profiles: ["manual"]
     working_dir: /scripts
     volumes:
-      - ./scripts:/scripts
+      - ../../scripts:/scripts
     environment:
       BASE_URL: ${BASE_URL:-}
       EVENT_ID: ${EVENT_ID:-}
@@ -23,7 +23,7 @@ services:
     profiles: ["manual"]
     working_dir: /scripts
     volumes:
-      - ./scripts:/scripts
+      - ../../scripts:/scripts
     environment:
       BASE_URL: ${BASE_URL:-}
       EVENT_ID: ${EVENT_ID:-}
