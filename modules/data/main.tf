@@ -14,6 +14,19 @@ module "rds" {
   subnet_ids             = var.subnet_ids
 }
 
+module "rds_proxy" {
+  source = "./rds_proxy"
+
+  project_name = var.project_name
+  environment  = var.environment
+  proxy_sg_id  = var.rds_proxy_sg_id
+  subnet_ids   = var.subnet_ids
+
+  db_secret_arn             = module.secrets_manager.rds_credentials_secret_arn
+  core_db_identifier        = module.rds.primary_identifier
+  reservation_db_identifier = module.rds.reservation_identifier
+}
+
 module "elasticache" {
   source            = "./elasticache"
   subnet_group_name = "${var.project_name}-${var.environment}-cache"

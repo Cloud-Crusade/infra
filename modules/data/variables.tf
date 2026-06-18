@@ -21,6 +21,11 @@ variable "rds_sg_id" {
   type = string
 }
 
+variable "rds_proxy_sg_id" {
+  description = "RDS Proxy 에 적용할 보안 그룹 ID"
+  type        = string
+}
+
 # db_name·db_username·db_password 는 secrets_manager 도 사용(롤·크리덴셜 시크릿)
 variable "db_name" {
   type = string
