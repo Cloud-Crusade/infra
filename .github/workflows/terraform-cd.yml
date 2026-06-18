@@ -15,6 +15,17 @@ on:
         options:
           - apply
           - destroy
+      api_backend:
+        description: API GW 백엔드 (dev apply 전용 — prod 는 무시)
+        type: choice
+        default: eks
+        options:
+          - eks
+          - test_ec2
+      extra_apply_args:
+        description: apply 추가 인자 (targeted/복구용, 예 "-refresh=false -replace=...")
+        type: string
+        default: ""
 
 jobs:
   terraform:
@@ -56,7 +67,19 @@ jobs:
       - name: Terraform apply
         if: inputs.action == 'apply'
         working-directory: environments/${{ inputs.environment }}
-        run: terraform apply -auto-approve -input=false -lock-timeout=5m
+        env:
+          TF_VAR_api_backend: ${{ inputs.api_backend }}
+          TF_VAR_enable_nlb_binding: "false"
+        run: terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}
+
+      # kubernetes_manifest(nlb_binding)는 클러스터·CRD 가 존재해야 plan 가능 → 위 apply 이후 2단계로 생성
+      - name: Terraform apply (NLB binding)
+        if: inputs.action == 'apply' && inputs.environment == 'dev' && inputs.api_backend == 'eks'
+        working-directory: environments/${{ inputs.environment }}
+        env:
+          TF_VAR_api_backend: ${{ inputs.api_backend }}
+          TF_VAR_enable_nlb_binding: "true"
+        run: terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}
 
       # destroy 는 ①람다 → ②ENI drain → ③전체 의 staged 단계로 분리.
       # VPC 람다 ENI 가 분리 안 된 채 잔존하면 SG·서브넷 삭제를 DependencyViolation 으로 장시간 막음
