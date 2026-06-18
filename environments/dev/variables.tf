@@ -325,11 +325,3 @@ variable "test_service_ingress_cidrs" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
-# ==== ARC =====
-variable "lb_arn_suffix" {
-  type = string
-}
-
-variable "target_group_arn_suffix" {
-  type = string
-}
