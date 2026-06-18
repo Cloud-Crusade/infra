@@ -156,7 +156,28 @@ jobs:
             sleep 30
           done
 
-      # ③ 나머지(또는 SG 없으면 전체) destroy — SG 가 막힘 없이 삭제됨
+      # TargetGroupBinding finalizer 강제 제거 — teardown 중 컨트롤러가 finalizer 를 못 지워
+      # kubernetes_manifest(nlb_binding) 삭제가 무한 대기하는 교착 방지(순서 의존만으론 부족).
+      # 어차피 NLB·타겟그룹도 삭제되므로 타겟 정상 해제는 불필요. 클러스터 부재 시 생략.
+      - name: Strip TargetGroupBinding finalizers
+        if: inputs.action == 'destroy'
+        continue-on-error: true
+        run: |
+          set +e
+          CL="$(aws eks list-clusters --query "clusters[?ends_with(@, '-${{ inputs.environment }}-eks')] | [0]" --output text 2>/dev/null)"
+          if [ -z "$CL" ] || [ "$CL" = "None" ]; then echo "EKS 클러스터 없음 — 생략"; exit 0; fi
+          aws eks update-kubeconfig --name "$CL" >/dev/null 2>&1 || { echo "kubeconfig 실패 — 생략"; exit 0; }
+          kubectl get targetgroupbinding -A \
+            -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null \
+          | while read -r t; do
+              [ -z "$t" ] && continue
+              ns="${t%%/*}"; name="${t##*/}"
+              kubectl patch targetgroupbinding "$name" -n "$ns" --type=merge \
+                -p '{"metadata":{"finalizers":null}}' 2>/dev/null && echo "finalizer 제거: $t"
+            done
+          echo "TGB finalizer 정리 완료"
+
+      # ③ 나머지(또는 SG 없으면 전체) destroy — SG·nlb_binding 이 막힘 없이 삭제됨
       - name: Terraform destroy
         if: inputs.action == 'destroy'
         working-directory: environments/${{ inputs.environment }}
