@@ -270,6 +270,10 @@ module "shared" {
   eks_cluster_name = ""
   api_gateway_name = ""
 
+  # ARC outcome 알람 dimension — NLB(api 레이어) 출력에서 직접 배선
+  lb_arn_suffix             = module.api.lb_arn_suffix
+  target_group_arn_suffixes = module.api.target_group_arn_suffixes
+
   secretsmanager_endpoint_security_group_id = module.network.secretsmanager_endpoint_security_group_id
   cluster_security_group_id                 = module.cluster.cluster_security_group_id
   nlb_sg_id                                 = module.api.nlb_sg_id

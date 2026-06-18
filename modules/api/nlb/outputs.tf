@@ -32,3 +32,13 @@ output "service_targets" {
     }
   }
 }
+
+output "lb_arn_suffix" {
+  description = "NLB ARN suffix (CloudWatch LoadBalancer dimension)"
+  value       = aws_lb.this.arn_suffix
+}
+
+output "target_group_arn_suffixes" {
+  description = "서비스명 → 타겟그룹 ARN suffix (CloudWatch TargetGroup dimension)"
+  value       = { for k, tg in aws_lb_target_group.svc : k => tg.arn_suffix }
+}

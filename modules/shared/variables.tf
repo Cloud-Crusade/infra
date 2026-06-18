@@ -51,6 +51,17 @@ variable "api_gateway_name" {
   default     = ""
 }
 
+# ARC zonal-shift outcome 알람(UnHealthyHostCount) dimension — api 레이어(NLB) 출력에서 주입
+variable "lb_arn_suffix" {
+  description = "NLB ARN suffix (ARC outcome 알람 LoadBalancer dimension)"
+  type        = string
+}
+
+variable "target_group_arn_suffixes" {
+  description = "서비스명 → 타겟그룹 ARN suffix (ARC outcome 알람 TargetGroup dimension, 전체 집계)"
+  type        = map(string)
+}
+
 # ================== SG 객체(security_group 서브모듈 입력) ==================
 variable "vpc_id" {
   type = string
