@@ -79,7 +79,7 @@ variable "lb_arn_suffix" {
   type        = string
 }
 
-variable "target_group_arn_suffix" {
-  description = "Target group ARN suffix for CloudWatch dimensions"
-  type        = string
+variable "target_group_arn_suffixes" {
+  description = "서비스명 → 타겟그룹 ARN suffix (ARC outcome 알람 dimension용, 전체 TG 집계)"
+  type        = map(string)
 }
