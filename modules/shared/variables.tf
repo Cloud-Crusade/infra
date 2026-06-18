@@ -102,6 +102,12 @@ variable "ticketing_http_port" {
   type        = number
 }
 
+variable "enable_cloudwatch" {
+  description = "CloudWatch(알람·대시보드·SNS) 모듈 생성 여부"
+  type        = bool
+  default     = true
+}
+
 # ================== nlb_binding (NLB 타겟그룹 ↔ 파드) ==================
 variable "enable_nlb_binding" {
   description = "TargetGroupBinding 생성 게이트 — clean-room plan 회피(컨트롤러 설치 후 활성화)"

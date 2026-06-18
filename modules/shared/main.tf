@@ -1,6 +1,7 @@
-# 관측성 — 공유 SNS + 전 서비스 알람/대시보드
+# 관측성 — 공유 SNS + 전 서비스 알람/대시보드. enable_cloudwatch 로 일괄 on/off
 module "cloudwatch" {
   source = "./cloudwatch"
+  count  = var.enable_cloudwatch ? 1 : 0
 
   project_name = var.project_name
   environment  = var.environment

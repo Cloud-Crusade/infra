@@ -67,3 +67,9 @@ variable "enable_az_failover" {
   type        = bool
   default     = false
 }
+
+variable "enable_cloudwatch" {
+  description = "CloudWatch 사용 여부 — APIGW 액세스 로그 그룹/스테이지 로깅 on/off"
+  type        = bool
+  default     = true
+}

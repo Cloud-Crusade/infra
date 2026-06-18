@@ -102,7 +102,7 @@ module "cluster" {
   cluster_endpoint_public_access       = var.eks_endpoint_public_access
   cluster_endpoint_private_access      = var.eks_endpoint_private_access
   cluster_endpoint_public_access_cidrs = var.eks_endpoint_public_access_cidrs
-  cluster_enabled_log_types            = var.eks_enabled_log_types
+  cluster_enabled_log_types            = var.enable_cloudwatch ? var.eks_enabled_log_types : []
   access_entries                       = var.eks_access_entries
 
   system_ng_instance_types = var.eks_system_ng_instance_types
@@ -232,6 +232,7 @@ module "api" {
   cloudfront_zone_id     = var.cloudfront_zone_id
 
   enable_az_failover = var.enable_az_failover
+  enable_cloudwatch  = var.enable_cloudwatch
 }
 
 # 공유/교차 레이어 — 관측성(cloudwatch) + 교차 SG 규칙 + NLB↔파드 바인딩.
@@ -243,9 +244,10 @@ module "shared" {
   # 모듈 전체 depends_on 은 cluster↔shared(SG) 순환을 유발하므로, 핸들만 thread 해 nlb_binding 에만 의존.
   aws_lb_controller_dependency = module.cluster.aws_lb_controller_dependency
 
-  project_name = var.project_name
-  environment  = var.environment
-  alarm_email  = var.alarm_email
+  project_name      = var.project_name
+  environment       = var.environment
+  alarm_email       = var.alarm_email
+  enable_cloudwatch = var.enable_cloudwatch
 
   # SG 객체 생성 입력(network 만 의존) — 도메인이 module.shared.*_sg_id 로 소비
   vpc_id               = module.network.vpc_id
@@ -294,6 +296,11 @@ module "shared" {
 moved {
   from = module.cloudwatch
   to   = module.shared.module.cloudwatch
+}
+# cloudwatch 모듈 count 게이팅(enable_cloudwatch) 도입 — 무인덱스 → [0] 주소 이전(재생성 없음)
+moved {
+  from = module.shared.module.cloudwatch
+  to   = module.shared.module.cloudwatch[0]
 }
 moved {
   from = aws_security_group_rule.sm_endpoint_from_lambda

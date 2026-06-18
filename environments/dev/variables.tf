@@ -147,6 +147,12 @@ variable "alarm_email" {
   default     = ""
 }
 
+variable "enable_cloudwatch" {
+  description = "CloudWatch 사용 전체 on/off — 알람·대시보드·EKS 컨트롤플레인 로그·APIGW 액세스 로그. off 면 부하테스트 비용 절감(관측은 Prometheus/Grafana)"
+  type        = bool
+  default     = true
+}
+
 
 # AWS Parameters and Secrets Lambda Extension (ap-northeast-2, x86_64)
 # captcha Lambda 가 Secrets Manager 를 런타임 캐시 조회할 때 사용. 버전은 최신 확인 후 갱신

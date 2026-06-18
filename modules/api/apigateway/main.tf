@@ -336,6 +336,7 @@ resource "aws_api_gateway_integration" "svc_proxy" {
 # ===== 배포 + 스테이지 =====
 
 resource "aws_cloudwatch_log_group" "access_log" {
+  count             = var.enable_access_logs ? 1 : 0
   name              = "/aws/apigateway/${local.name}-access-log"
   retention_in_days = 14
 }
@@ -408,7 +409,8 @@ resource "aws_api_gateway_deployment" "this" {
 
 # API Gateway 계정/리전 단위 CloudWatch Logs 푸시 역할 — stage access 로깅 활성화의 전제(계정당 1회)
 resource "aws_iam_role" "cloudwatch" {
-  name = "${var.project_name}-${var.environment}-apigw-cloudwatch"
+  count = var.enable_access_logs ? 1 : 0
+  name  = "${var.project_name}-${var.environment}-apigw-cloudwatch"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -421,12 +423,14 @@ resource "aws_iam_role" "cloudwatch" {
 }
 
 resource "aws_iam_role_policy_attachment" "cloudwatch" {
-  role       = aws_iam_role.cloudwatch.name
+  count      = var.enable_access_logs ? 1 : 0
+  role       = aws_iam_role.cloudwatch[0].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
 }
 
 resource "aws_api_gateway_account" "this" {
-  cloudwatch_role_arn = aws_iam_role.cloudwatch.arn
+  count               = var.enable_access_logs ? 1 : 0
+  cloudwatch_role_arn = aws_iam_role.cloudwatch[0].arn
 
   depends_on = [aws_iam_role_policy_attachment.cloudwatch]
 }
@@ -439,20 +443,23 @@ resource "aws_api_gateway_stage" "this" {
   # 계정 CW Logs 역할 설정 후 access 로깅 활성(미설정 시 UpdateStage 400)
   depends_on = [aws_api_gateway_account.this]
 
-  access_log_settings {
-    destination_arn = aws_cloudwatch_log_group.access_log.arn
+  dynamic "access_log_settings" {
+    for_each = var.enable_access_logs ? [1] : []
+    content {
+      destination_arn = aws_cloudwatch_log_group.access_log[0].arn
 
-    format = jsonencode({
-      requestId      = "$context.requestId"
-      ip             = "$context.identity.sourceIp"
-      requestTime    = "$context.requestTime"
-      httpMethod     = "$context.httpMethod"
-      resourcePath   = "$context.resourcePath"
-      path           = "$context.path"
-      status         = "$context.status"
-      responseLength = "$context.responseLength"
-      userAgent      = "$context.identity.userAgent"
-    })
+      format = jsonencode({
+        requestId      = "$context.requestId"
+        ip             = "$context.identity.sourceIp"
+        requestTime    = "$context.requestTime"
+        httpMethod     = "$context.httpMethod"
+        resourcePath   = "$context.resourcePath"
+        path           = "$context.path"
+        status         = "$context.status"
+        responseLength = "$context.responseLength"
+        userAgent      = "$context.identity.userAgent"
+      })
+    }
   }
 }
 
