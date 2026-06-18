@@ -1,6 +1,6 @@
 output "resource_identifier" {
-  description = "ARC가 적용된 대상 리소스의 식별자"
-  value       = aws_arczonalshift_zonal_autoshift_configuration.this.resource_identifier
+  description = "ARC가 적용된 대상 리소스의 식별자(ARN)"
+  value       = aws_arczonalshift_zonal_autoshift_configuration.this.resource_arn
 }
 
 output "zonal_autoshift_status" {

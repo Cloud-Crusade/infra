@@ -4,7 +4,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 6.0"
     }
     tls = {
       source  = "hashicorp/tls"
@@ -277,9 +277,11 @@ module "shared" {
   eks_cluster_name = ""
   api_gateway_name = ""
 
-  # ARC outcome 알람 dimension — NLB(api 레이어) 출력에서 직접 배선
+  # ARC outcome 알람 dimension + zonal autoshift 대상 — NLB(api 레이어) 출력에서 직접 배선
   lb_arn_suffix             = module.api.lb_arn_suffix
   target_group_arn_suffixes = module.api.target_group_arn_suffixes
+  lb_arn                    = module.api.nlb_arn
+  enable_az_failover        = var.enable_az_failover
 
   secretsmanager_endpoint_security_group_id = module.network.secretsmanager_endpoint_security_group_id
   cluster_security_group_id                 = module.cluster.cluster_security_group_id

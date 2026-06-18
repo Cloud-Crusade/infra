@@ -83,3 +83,9 @@ variable "target_group_arn_suffixes" {
   description = "서비스명 → 타겟그룹 ARN suffix (ARC outcome 알람 dimension용, 전체 TG 집계)"
   type        = map(string)
 }
+
+variable "enable_az_failover" {
+  description = "AZ Failover 활성 시 ARC outcome 알람의 actions 활성화"
+  type        = bool
+  default     = false
+}

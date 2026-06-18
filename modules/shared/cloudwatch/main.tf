@@ -382,7 +382,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region  = data.aws_region.current.name
+          region  = data.aws_region.current.region
           title   = "SQS Queue Depth"
           metrics = [for q in var.sqs_queue_names : ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", q]]
           period  = 300
@@ -398,7 +398,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region  = data.aws_region.current.name
+          region  = data.aws_region.current.region
           title   = "SQS Oldest Message"
           metrics = [for q in var.sqs_queue_names : ["AWS/SQS", "ApproximateAgeOfOldestMessage", "QueueName", q]]
           period  = 300
@@ -414,7 +414,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region  = data.aws_region.current.name
+          region  = data.aws_region.current.region
           title   = "SQS Messages Received"
           metrics = [for q in var.sqs_queue_names : ["AWS/SQS", "NumberOfMessagesReceived", "QueueName", q]]
           period  = 300
@@ -432,7 +432,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Main Cache CPU"
 
           metrics = [
@@ -452,7 +452,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Waiting Room Cache CPU"
 
           metrics = [
@@ -474,7 +474,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Main Cache Connections"
 
           metrics = [
@@ -494,7 +494,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Waiting Room Cache Connections"
 
           metrics = [
@@ -516,7 +516,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region  = data.aws_region.current.name
+          region  = data.aws_region.current.region
           title   = "ElastiCache Memory Usage"
           metrics = [for id in var.elasticache_cluster_ids : ["AWS/ElastiCache", "DatabaseMemoryUsagePercentage", "CacheClusterId", id, "CacheNodeId", "0001"]]
           period  = 300
@@ -532,7 +532,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region  = data.aws_region.current.name
+          region  = data.aws_region.current.region
           title   = "ElastiCache Evictions"
           metrics = [for id in var.elasticache_cluster_ids : ["AWS/ElastiCache", "Evictions", "CacheClusterId", id, "CacheNodeId", "0001"]]
           period  = 300
@@ -550,7 +550,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Primary DB CPU"
 
           metrics = [
@@ -570,7 +570,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Primary Replica DB CPU"
 
           metrics = [
@@ -590,7 +590,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Reservation DB CPU"
 
           metrics = [
@@ -610,7 +610,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Reservation Replica DB CPU"
 
           metrics = [
@@ -630,7 +630,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Reservation Replica 2 DB CPU"
 
           metrics = [
@@ -652,7 +652,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Primary DB Connections"
 
           metrics = [
@@ -672,7 +672,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Primary Replica DB Connections"
 
           metrics = [
@@ -692,7 +692,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Reservation DB Connections"
 
           metrics = [
@@ -712,7 +712,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Reservation Replica DB Connections"
 
           metrics = [
@@ -732,7 +732,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region = data.aws_region.current.name
+          region = data.aws_region.current.region
           title  = "Reservation Replica 2 DB Connections"
 
           metrics = [
@@ -754,7 +754,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region  = data.aws_region.current.name
+          region  = data.aws_region.current.region
           title   = "RDS Read Latency"
           metrics = [for id in var.rds_instance_ids : ["AWS/RDS", "ReadLatency", "DBInstanceIdentifier", id]]
           period  = 300
@@ -770,7 +770,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region  = data.aws_region.current.name
+          region  = data.aws_region.current.region
           title   = "RDS Write Latency"
           metrics = [for id in var.rds_instance_ids : ["AWS/RDS", "WriteLatency", "DBInstanceIdentifier", id]]
           period  = 300
@@ -788,7 +788,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region  = data.aws_region.current.name
+          region  = data.aws_region.current.region
           title   = "Lambda Invocations"
           metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Invocations", "FunctionName", fn]]
           period  = 60
@@ -804,7 +804,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region  = data.aws_region.current.name
+          region  = data.aws_region.current.region
           title   = "Lambda Errors"
           metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Errors", "FunctionName", fn]]
           period  = 60
@@ -820,7 +820,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region  = data.aws_region.current.name
+          region  = data.aws_region.current.region
           title   = "Lambda Duration"
           metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Duration", "FunctionName", fn]]
           period  = 60
@@ -836,7 +836,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
 
         properties = {
-          region  = data.aws_region.current.name
+          region  = data.aws_region.current.region
           title   = "Lambda Throttles"
           metrics = [for fn in var.lambda_function_names : ["AWS/Lambda", "Throttles", "FunctionName", fn]]
           period  = 60
@@ -909,5 +909,5 @@ resource "aws_cloudwatch_metric_alarm" "arc_zonal_shift" {
   }
 
   alarm_description = "ARC Zonal Shift outcome alarm — NLB 전체 TG UnHealthyHostCount 합산"
-  actions_enabled   = false
+  actions_enabled   = var.enable_az_failover
 }

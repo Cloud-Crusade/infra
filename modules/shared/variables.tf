@@ -108,6 +108,18 @@ variable "enable_cloudwatch" {
   default     = true
 }
 
+variable "enable_az_failover" {
+  description = "AZ Failover 활성 시 ARC zonal autoshift 등록(ENABLED). outcome 알람은 CloudWatch → enable_cloudwatch 필요"
+  type        = bool
+  default     = false
+}
+
+variable "lb_arn" {
+  description = "ARC zonal autoshift 대상 NLB ARN"
+  type        = string
+  default     = ""
+}
+
 # ================== nlb_binding (NLB 타겟그룹 ↔ 파드) ==================
 variable "enable_nlb_binding" {
   description = "TargetGroupBinding 생성 게이트 — clean-room plan 회피(컨트롤러 설치 후 활성화)"

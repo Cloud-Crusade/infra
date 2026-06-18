@@ -7,6 +7,11 @@ output "service_targets" {
   value = module.nlb.service_targets
 }
 
+# ARC zonal autoshift 대상(shared/arc 소비) — 전체 NLB ARN
+output "nlb_arn" {
+  value = module.nlb.nlb_arn
+}
+
 # ARC zonal-shift outcome 알람 dimension(shared/cloudwatch 소비)
 output "lb_arn_suffix" {
   value = module.nlb.lb_arn_suffix

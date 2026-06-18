@@ -20,6 +20,30 @@ module "cloudwatch" {
   # ARC zonal-shift outcome 알람 dimension(NLB suffix)
   lb_arn_suffix             = var.lb_arn_suffix
   target_group_arn_suffixes = var.target_group_arn_suffixes
+  enable_az_failover        = var.enable_az_failover
+}
+
+# AZ Failover 전제 가드 — ARC outcome 알람이 CloudWatch 알람이므로 cloudwatch 비활성과 동시 사용 불가
+resource "terraform_data" "az_failover_guard" {
+  lifecycle {
+    precondition {
+      condition     = !var.enable_az_failover || var.enable_cloudwatch
+      error_message = "enable_az_failover 는 enable_cloudwatch=true 를 요구합니다 (ARC outcome 알람이 CloudWatch 알람)."
+    }
+  }
+}
+
+# ARC zonal autoshift — AZ 장애 자동 감지 시 트래픽 이동. outcome 알람으로 practice run 결과 판단
+module "arc" {
+  source = "../arc"
+  count  = var.enable_az_failover ? 1 : 0
+
+  lb_arn                 = var.lb_arn
+  zonal_autoshift_status = "ENABLED"
+  outcome_alarms = [{
+    type             = "CLOUDWATCH"
+    alarm_identifier = one(module.cloudwatch[*].arc_zonal_shift_alarm_arn)
+  }]
 }
 
 # 도메인 SG 객체 — eks/rds/cache/lambda/bastion. network 에만 의존(도메인 출력 비참조) → 도메인이 선행 소비
