@@ -54,13 +54,16 @@ resource "aws_instance" "bastion" {
                 # xk6-sql 커스텀 k6 이미지 사전 빌드(최초 1회, 실패해도 부팅 계속)
                 cd /home/ec2-user/k6 && docker compose build k6-sql || true
 
-                # grafana compose 파일 생성
-                mkdir -p /home/ec2-user/grafana
+                # grafana compose + Prometheus 데이터소스 프로비저닝 생성
+                mkdir -p /home/ec2-user/grafana/provisioning/datasources
                 cat > /home/ec2-user/grafana/docker-compose.yml <<'COMPOSE'
                 ${file("${path.module}/compose/grafana/docker-compose.yml")}
                 COMPOSE
+                cat > /home/ec2-user/grafana/provisioning/datasources/prometheus.yml <<'DATASOURCE'
+                ${file("${path.module}/compose/grafana/provisioning/datasources/prometheus.yml")}
+                DATASOURCE
 
-                # grafana 실행
+                # grafana 실행 (PROMETHEUS_URL 은 운영자가 노출 방식에 맞춰 주입)
                 cd /home/ec2-user/grafana
                 docker compose up -d
                 EOF
