@@ -9,6 +9,9 @@ module "eventbridge" {
   source       = "./eventbridge"
   project_name = var.project_name
   environment  = var.environment
+
+  target_lambda_arn           = module.lambda.function_arns["bot_block"]
+  target_lambda_function_name = module.lambda.function_names["bot_block"]
 }
 
 module "lambda" {

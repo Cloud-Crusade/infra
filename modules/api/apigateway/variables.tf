@@ -84,6 +84,16 @@ variable "authorizer_lambda_function_name" {
   type        = string
 }
 
+variable "bot_check_lambda_invoke_arn" {
+  description = "봇 차단 검사 Lambda 의 invoke ARN (모듈 외부 생성)"
+  type        = string
+}
+
+variable "bot_check_lambda_function_name" {
+  description = "봇 차단 검사 Lambda 함수 이름 (invoke 권한 부여용)"
+  type        = string
+}
+
 variable "api_domain_name" {
   description = "API Gateway 커스텀 도메인 (Route53 api 레코드와 동일, 예: api.einsof.app)"
   type        = string

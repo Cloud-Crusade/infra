@@ -60,6 +60,27 @@ resource "aws_api_gateway_gateway_response" "access_denied" {
   response_parameters = local.gateway_cors_headers
 }
 
+# 봇 차단 여부 실시간 판별 Lambda authorizer
+# identity_source 를 헤더 대신 context.identity.sourceIp 로 설정 — IP 는 항상 존재하므로
+# 헤더 누락으로 Lambda 호출 자체가 스킵되는 문제를 방지. TTL=0 으로 캐싱 비활성.
+resource "aws_api_gateway_authorizer" "bot_check" {
+  name                             = "${local.name}-bot-check-authorizer"
+  rest_api_id                      = aws_api_gateway_rest_api.this.id
+  type                             = "REQUEST"
+  authorizer_uri                   = var.bot_check_lambda_invoke_arn
+  identity_source                  = "context.identity.sourceIp"
+  authorizer_result_ttl_in_seconds = 0
+}
+
+# 게이트웨이 → bot_check authorizer Lambda invoke 권한
+resource "aws_lambda_permission" "bot_check" {
+  statement_id  = "AllowApiGatewayInvokeBotCheck"
+  action        = "lambda:InvokeFunction"
+  function_name = var.bot_check_lambda_function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.this.execution_arn}/authorizers/${aws_api_gateway_authorizer.bot_check.id}"
+}
+
 # ===== /reservations =====
 # 대기열 입장 토큰(Reservation)은 스파이크 경로인 예매 진입(POST 생성)에만 게이트한다.
 # 확인(GET)·취소(DELETE)는 access 토큰만 필요(백엔드 getCurrentUserId 가 인증) → authorization=NONE 으로 프록시.
@@ -329,7 +350,8 @@ resource "aws_api_gateway_method" "svc_root" {
   rest_api_id   = aws_api_gateway_rest_api.this.id
   resource_id   = aws_api_gateway_resource.svc_root[each.key].id
   http_method   = "ANY"
-  authorization = "NONE"
+  authorization = each.key == "payment" ? "CUSTOM" : "NONE"
+  authorizer_id = each.key == "payment" ? aws_api_gateway_authorizer.bot_check.id : null
 }
 
 resource "aws_api_gateway_integration" "svc_root" {
@@ -349,7 +371,8 @@ resource "aws_api_gateway_method" "svc_proxy" {
   rest_api_id        = aws_api_gateway_rest_api.this.id
   resource_id        = aws_api_gateway_resource.svc_proxy[each.key].id
   http_method        = "ANY"
-  authorization      = "NONE"
+  authorization      = each.key == "payment" ? "CUSTOM" : "NONE"
+  authorizer_id      = each.key == "payment" ? aws_api_gateway_authorizer.bot_check.id : null
   request_parameters = { "method.request.path.proxy" = true }
 }
 
@@ -393,6 +416,8 @@ resource "aws_api_gateway_deployment" "this" {
       var.backend,
       jsonencode(local.svc_base),
       aws_api_gateway_authorizer.reservation.id,
+      aws_api_gateway_authorizer.bot_check.id,
+      aws_lambda_permission.bot_check.id,
       aws_api_gateway_gateway_response.unauthorized.id,
       aws_api_gateway_gateway_response.unauthorized.status_code,
       aws_api_gateway_gateway_response.access_denied.id,
@@ -441,6 +466,8 @@ resource "aws_api_gateway_deployment" "this" {
     aws_api_gateway_integration.svc_root,
     aws_api_gateway_integration.svc_proxy,
     aws_api_gateway_authorizer.reservation,
+    aws_api_gateway_authorizer.bot_check,
+    aws_lambda_permission.bot_check,
     aws_api_gateway_gateway_response.unauthorized,
     aws_api_gateway_gateway_response.access_denied
   ]
