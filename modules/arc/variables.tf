@@ -1,6 +1,6 @@
 variable "lb_arn" {
   description = "ALB/NLB ARN"
-  type = string
+  type        = string
 }
 
 variable "zonal_autoshift_status" {
