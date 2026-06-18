@@ -1,10 +1,10 @@
-import http from 'k6/http';
 import { check, sleep } from 'k6';
-import crypto from 'k6/crypto';
 import { Trend, Gauge } from 'k6/metrics';
 // [PostgreSQL 플러그인] DB 시스템 뷰 직접 질의를 위한 내장 모듈
 import sql from 'k6/x/sql';
 import driver from 'k6/x/sql/driver/postgres';
+// [공식 AWS 라이브러리] SQS 클라이언트 — SigV4 서명·SQS JSON 프로토콜을 내부에서 처리
+import { AWSConfig, SQSClient } from 'https://jslib.k6.io/aws/0.14.0/sqs.js';
 
 // [5초 주기 지표] PostgreSQL 엔진이 실제로 처리한 '실질 초당 트래픽(Real TPS)' 분포
 const rdsIntervalRealTPS = new Trend('rds_actual_interval_tps');
@@ -22,14 +22,27 @@ const CONFIG = {
     RDS_DSN: __ENV.RDS_DSN || ''
 };
 
-// AWS Query API 사양 정렬
-CONFIG.SQS_ENDPOINT = `https://sqs.${CONFIG.AWS_REGION}.amazonaws.com/`;
+// AWS 표준 큐 URL (sendMessageBatch 의 QueueUrl)
 CONFIG.SQS_QUEUE_URL = `https://sqs.${CONFIG.AWS_REGION}.amazonaws.com/${CONFIG.AWS_ACCOUNT_ID}/${CONFIG.QUEUE_NAME}`;
 
-// [Init Context] DB 커넥션 풀은 여기서 단 한 번만 생성한다.
+// [환경변수 검증] 클라이언트 생성 전 init 단계에서 누락 즉시 차단
+const REQUIRED_VARS = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION', 'AWS_ACCOUNT_ID', 'QUEUE_NAME', 'DATABASE_NAME', 'RDS_DSN'];
+const missingVars = REQUIRED_VARS.filter((k) => !CONFIG[k]);
+if (missingVars.length > 0) {
+    throw new Error(`[환경변수 오류] 부하 테스트를 실행할 수 없습니다: ${missingVars.join(', ')}`);
+}
+
+// [Init Context] DB 커넥션 풀과 SQS 클라이언트는 여기서 단 한 번만 생성한다.
 // xk6-sql 의 sql.open() 은 커넥션 풀을 만들므로 setup/default/teardown(특히 반복 루프) 안에서
 // 호출하면 풀이 무한 증식해 커넥션 고갈·메모리 누수가 발생한다. 전 함수가 이 핸들을 공유한다.
 const db = sql.open(driver, CONFIG.RDS_DSN);
+
+// 자격증명·리전만 주입하면 SigV4 서명은 라이브러리가 처리(수동 서명 코드 제거)
+const sqs = new SQSClient(new AWSConfig({
+    region: CONFIG.AWS_REGION,
+    accessKeyId: CONFIG.AWS_ACCESS_KEY_ID,
+    secretAccessKey: CONFIG.AWS_SECRET_ACCESS_KEY,
+}));
 
 const WRITE_COUNT_QUERY = `SELECT tup_inserted FROM pg_stat_database WHERE datname = '${CONFIG.DATABASE_NAME}';`;
 
@@ -63,80 +76,22 @@ export const options = {
     },
 };
 
-// AWS Signature V4 사양에 부합하는 RFC 3986 인코딩 헬퍼
-function awsAws4Encode(str) {
-    return encodeURIComponent(str).replace(/[!'()*]/g, function(c) {
-        return '%' + c.charCodeAt(0).toString(16).toUpperCase();
-    });
-}
-
-// AWS 표준 Signature V4 서명 생성기
-function signSqsFormRequest(payload, region, accessKey, secretKey) {
-    const amzDate = new Date().toISOString().replace(/[:\-]|\.\d{3}/g, '');
-    const datestamp = amzDate.substring(0, 8);
-    const host = `sqs.${region}.amazonaws.com`;
-    const canonicalUri = '/';
-    const canonicalQueryString = '';
-
-    const canonicalHeaders =
-        'content-type:application/x-www-form-urlencoded; charset=utf-8\n' +
-        'host:' + host + '\n' +
-        'x-amz-date:' + amzDate + '\n';
-
-    const signedHeaders = 'content-type;host;x-amz-date';
-    const payloadHash = crypto.sha256(payload, 'hex');
-
-    const canonicalRequest = 'POST\n' + canonicalUri + '\n' + canonicalQueryString + '\n' + canonicalHeaders + '\n' + signedHeaders + '\n' + payloadHash;
-    const algorithm = 'AWS4-HMAC-SHA256';
-    const credentialScope = `${datestamp}/${region}/sqs/aws4_request`;
-    const stringToSign = algorithm + '\n' + amzDate + '\n' + credentialScope + '\n' + crypto.sha256(canonicalRequest, 'hex');
-
-    const kDate = crypto.hmac('sha256', 'AWS4' + secretKey, datestamp, 'binary');
-    const kRegion = crypto.hmac('sha256', kDate, region, 'binary');
-    const kService = crypto.hmac('sha256', kRegion, 'sqs', 'binary');
-    const kSigning = crypto.hmac('sha256', kService, 'aws4_request', 'binary');
-
-    const signature = crypto.hmac('sha256', kSigning, stringToSign, 'hex');
-    const authorizationHeader = algorithm + ' Credential=' + accessKey + '/' + credentialScope + ', SignedHeaders=' + signedHeaders + ', Signature=' + signature;
-
-    return {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
-        'X-Amz-Date': amzDate,
-        'Authorization': authorizationHeader,
-        'Host': host
-    };
-}
-
 // VU별 격리 환경 타이머 변수 초기화
 let lastCheckedTime = Date.now();
 let lastCheckedCount = 0;
 
 // 1. [시작 단계] 부하 직전 PostgreSQL 누적 INSERT 카운트 백업 (Init 의 공유 db 핸들 사용)
 export function setup() {
-    const missingVars = [];
-    if (!CONFIG.AWS_ACCESS_KEY_ID) missingVars.push('AWS_ACCESS_KEY_ID');
-    if (!CONFIG.AWS_SECRET_ACCESS_KEY) missingVars.push('AWS_SECRET_ACCESS_KEY');
-    if (!CONFIG.AWS_ACCOUNT_ID) missingVars.push('AWS_ACCOUNT_ID');
-    if (!CONFIG.QUEUE_NAME) missingVars.push('QUEUE_NAME');
-    if (!CONFIG.AWS_REGION) missingVars.push('AWS_REGION');
-    if (!CONFIG.RDS_DSN) missingVars.push('RDS_DSN');
-    if (!CONFIG.DATABASE_NAME) missingVars.push('DATABASE_NAME');
-
-    if (missingVars.length > 0) {
-        throw new Error(`[환경변수 오류] 부하 테스트를 실행할 수 없습니다: ${missingVars.join(', ')}`);
-    }
-
     return { startCount: readWriteCount(), startTime: Date.now() };
 }
 
 // 2. [부하 단계] SQS 타격 진행 및 VU 1번 격리 기반 5초 주기 DB 통계 수집
-export default function (setupData) {
-    let formData = `Action=SendMessageBatch&QueueUrl=${awsAws4Encode(CONFIG.SQS_QUEUE_URL)}&Version=2012-11-05`;
+export default async function (setupData) {
+    const entries = [];
 
     for (let i = 0; i < 10; i++) {
         const timestamp = Date.now();
         const uniqueId = `resv_${__VU}_${__ITER}_${i}_${timestamp}`;
-        const index = i + 1;
 
         // 요구사항 반영: 식별하기 편하도록 TEST- 접두사를 명시한 구조로 바디 조립
         const messageBody = JSON.stringify({
@@ -146,13 +101,26 @@ export default function (setupData) {
             timestamp: timestamp
         });
 
-        formData += `&SendMessageBatchRequestEntry.${index}.Id=${uniqueId}&SendMessageBatchRequestEntry.${index}.MessageBody=${awsAws4Encode(messageBody)}&SendMessageBatchRequestEntry.${index}.MessageGroupId=${MOCK_DATA.GROUP_PREFIX}-VU-${__VU}-${i}&SendMessageBatchRequestEntry.${index}.MessageDeduplicationId=${uniqueId}`;
+        // FIFO 큐 옵션(MessageGroupId/MessageDeduplicationId)은 entry 의 messageOptions 로 전달
+        entries.push({
+            messageId: uniqueId,
+            messageBody: messageBody,
+            messageOptions: {
+                messageGroupId: `${MOCK_DATA.GROUP_PREFIX}-VU-${__VU}-${i}`,
+                messageDeduplicationId: uniqueId,
+            },
+        });
     }
 
-    const headers = signSqsFormRequest(formData, CONFIG.AWS_REGION, CONFIG.AWS_ACCESS_KEY_ID, CONFIG.AWS_SECRET_ACCESS_KEY);
-
-    // 실제 SQS POST 전송
-    let res = http.post(CONFIG.SQS_ENDPOINT, formData, { headers: headers });
+    // 실제 SQS 배치 전송 — 라이브러리가 SigV4 서명·JSON 프로토콜 처리
+    let batchOk = false;
+    try {
+        const result = await sqs.sendMessageBatch(CONFIG.SQS_QUEUE_URL, entries);
+        batchOk = result.failed.length === 0;
+    } catch (err) {
+        // 테스트는 중단하지 않되 원인 파악을 위해 에러는 로깅 (CWE-391: 에러 은닉 방지)
+        console.error('[SQS 전송 에러]', err.message);
+    }
 
     // -------------------------------------------------------------------------
     // [격리 제어] VU 1번이 5초 주기로만 RDS 실측 트래픽 산정 (공유 db 핸들 재사용)
@@ -179,7 +147,7 @@ export default function (setupData) {
         lastCheckedTime = currentTime;
     }
 
-    check(res, { 'SQS HTTP 200 OK': (r) => r.status === 200 });
+    check(batchOk, { 'SQS 배치 전송 성공': (ok) => ok === true });
     sleep(0.05);
 }
 
