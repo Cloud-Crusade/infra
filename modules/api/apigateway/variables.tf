@@ -93,3 +93,9 @@ variable "route53_zone_id" {
   description = "ACM DNS 검증 레코드를 생성할 기존 Route53 호스팅 영역 ID"
   type        = string
 }
+
+variable "enable_access_logs" {
+  description = "스테이지 액세스 로그(CloudWatch Logs) 활성화 여부. off 면 로그 그룹·계정 역할·로깅 설정 미생성"
+  type        = bool
+  default     = true
+}

@@ -4,7 +4,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 6.0"
     }
     tls = {
       source  = "hashicorp/tls"
@@ -102,7 +102,7 @@ module "cluster" {
   cluster_endpoint_public_access       = var.eks_endpoint_public_access
   cluster_endpoint_private_access      = var.eks_endpoint_private_access
   cluster_endpoint_public_access_cidrs = var.eks_endpoint_public_access_cidrs
-  cluster_enabled_log_types            = var.eks_enabled_log_types
+  cluster_enabled_log_types            = var.enable_cloudwatch ? var.eks_enabled_log_types : []
   access_entries                       = var.eks_access_entries
 
   system_ng_instance_types = var.eks_system_ng_instance_types
@@ -162,6 +162,8 @@ module "data" {
   authorization_secret_value    = random_password.authorization.result
   reservation_private_key_value = tls_private_key.reservation.private_key_pem
   captcha_hmac_secret_value     = random_password.captcha_hmac.result
+
+  enable_az_failover = var.enable_az_failover
 }
 
 # 클라이언트 정적 호스팅(CloudFront + www ACM). acm_www 는 us-east-1 전용 → aliased provider 전달
@@ -228,6 +230,9 @@ module "api" {
   route53_zone_id        = var.route53_zone_id
   cloudfront_domain_name = module.frontend.cloudfront_domain_name
   cloudfront_zone_id     = var.cloudfront_zone_id
+
+  enable_az_failover = var.enable_az_failover
+  enable_cloudwatch  = var.enable_cloudwatch
 }
 
 # 공유/교차 레이어 — 관측성(cloudwatch) + 교차 SG 규칙 + NLB↔파드 바인딩.
@@ -239,9 +244,10 @@ module "shared" {
   # 모듈 전체 depends_on 은 cluster↔shared(SG) 순환을 유발하므로, 핸들만 thread 해 nlb_binding 에만 의존.
   aws_lb_controller_dependency = module.cluster.aws_lb_controller_dependency
 
-  project_name = var.project_name
-  environment  = var.environment
-  alarm_email  = var.alarm_email
+  project_name      = var.project_name
+  environment       = var.environment
+  alarm_email       = var.alarm_email
+  enable_cloudwatch = var.enable_cloudwatch
 
   # SG 객체 생성 입력(network 만 의존) — 도메인이 module.shared.*_sg_id 로 소비
   vpc_id               = module.network.vpc_id
@@ -271,9 +277,11 @@ module "shared" {
   eks_cluster_name = ""
   api_gateway_name = ""
 
-  # ARC outcome 알람 dimension — NLB(api 레이어) 출력에서 직접 배선
+  # ARC outcome 알람 dimension + zonal autoshift 대상 — NLB(api 레이어) 출력에서 직접 배선
   lb_arn_suffix             = module.api.lb_arn_suffix
   target_group_arn_suffixes = module.api.target_group_arn_suffixes
+  lb_arn                    = module.api.nlb_arn
+  enable_az_failover        = var.enable_az_failover
 
   secretsmanager_endpoint_security_group_id = module.network.secretsmanager_endpoint_security_group_id
   cluster_security_group_id                 = module.cluster.cluster_security_group_id
@@ -290,6 +298,11 @@ module "shared" {
 moved {
   from = module.cloudwatch
   to   = module.shared.module.cloudwatch
+}
+# cloudwatch 모듈 count 게이팅(enable_cloudwatch) 도입 — 무인덱스 → [0] 주소 이전(재생성 없음)
+moved {
+  from = module.shared.module.cloudwatch
+  to   = module.shared.module.cloudwatch[0]
 }
 moved {
   from = aws_security_group_rule.sm_endpoint_from_lambda

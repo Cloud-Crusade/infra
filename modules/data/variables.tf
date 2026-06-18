@@ -72,3 +72,9 @@ variable "captcha_hmac_secret_value" {
   type      = string
   sensitive = true
 }
+
+variable "enable_az_failover" {
+  description = "AZ Failover 모드 — RDS writer Multi-AZ on/off"
+  type        = bool
+  default     = false
+}

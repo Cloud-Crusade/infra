@@ -147,6 +147,12 @@ variable "alarm_email" {
   default     = ""
 }
 
+variable "enable_cloudwatch" {
+  description = "CloudWatch 사용 전체 on/off — 알람·대시보드·EKS 컨트롤플레인 로그·APIGW 액세스 로그. off 면 부하테스트 비용 절감(관측은 Prometheus/Grafana)"
+  type        = bool
+  default     = true
+}
+
 
 # AWS Parameters and Secrets Lambda Extension (ap-northeast-2, x86_64)
 # captcha Lambda 가 Secrets Manager 를 런타임 캐시 조회할 때 사용. 버전은 최신 확인 후 갱신
@@ -263,6 +269,12 @@ variable "eks_access_entries" {
 # LB Controller(CRD) 설치 후 2단계로 true 적용(TF_VAR_enable_nlb_binding=true).
 variable "enable_nlb_binding" {
   description = "NLB 타겟그룹 ↔ 파드 IP TargetGroupBinding 생성 여부"
+  type        = bool
+  default     = false
+}
+
+variable "enable_az_failover" {
+  description = "AZ Failover(NLB zonal shift + RDS Multi-AZ, 추후 ARC) 일괄 on/off. off 면 cross-zone 모드"
   type        = bool
   default     = false
 }

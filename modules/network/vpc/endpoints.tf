@@ -17,7 +17,7 @@ resource "aws_security_group" "secretsmanager_endpoint" {
 resource "aws_vpc_endpoint" "secretsmanager" {
   count               = var.enable_secretsmanager_endpoint ? 1 : 0
   vpc_id              = aws_vpc.this.id
-  service_name        = "com.amazonaws.${data.aws_region.current.name}.secretsmanager"
+  service_name        = "com.amazonaws.${data.aws_region.current.region}.secretsmanager"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
   security_group_ids  = [aws_security_group.secretsmanager_endpoint[0].id]

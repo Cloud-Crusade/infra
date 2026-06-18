@@ -8,6 +8,10 @@ module "nlb" {
   vpc_cidr     = var.vpc_cidr
   target_port  = var.ticketing_http_port
 
+  # AZ Failover: on 이면 zonal shift, off 면 cross-zone (NLB 상 상호 배타)
+  enable_cross_zone_load_balancing = !var.enable_az_failover
+  enable_zonal_shift               = var.enable_az_failover
+
   # 4서비스 외부 노출 — 포트로 분리, apigateway 가 경로별로 연결
   services = {
     auth        = { listener_port = 8001 }
@@ -23,8 +27,9 @@ module "apigateway" {
   project_name = var.project_name
   environment  = var.environment
 
-  backend          = var.api_backend
-  test_backend_url = var.test_backend_url
+  backend            = var.api_backend
+  test_backend_url   = var.test_backend_url
+  enable_access_logs = var.enable_cloudwatch
 
   # 경로 프리픽스 → NLB 리스너 포트(VPC Link). path 는 백엔드 FastAPI 라우터 prefix 와 일치
   nlb_arn      = module.nlb.nlb_arn

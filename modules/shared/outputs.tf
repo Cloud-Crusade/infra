@@ -1,9 +1,9 @@
 output "sns_topic_arn" {
-  value = module.cloudwatch.sns_topic_arn
+  value = one(module.cloudwatch[*].sns_topic_arn)
 }
 
 output "dashboard_name" {
-  value = module.cloudwatch.dashboard_name
+  value = one(module.cloudwatch[*].dashboard_name)
 }
 
 # ================== SG id (도메인 레이어가 소비) ==================

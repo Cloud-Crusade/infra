@@ -13,8 +13,8 @@ resource "aws_db_instance" "primary" {
   engine_version    = var.engine_version
   instance_class    = var.instance_class
 
-  availability_zone = var.azs[0]
-  multi_az          = false
+  availability_zone = var.multi_az ? null : var.azs[0]
+  multi_az          = var.multi_az
 
   db_name  = var.db_name
   username = var.db_username
@@ -53,8 +53,8 @@ resource "aws_db_instance" "reservation" {
   engine_version    = var.engine_version
   instance_class    = var.instance_class
 
-  availability_zone = var.azs[1]
-  multi_az          = false
+  availability_zone = var.multi_az ? null : var.azs[1]
+  multi_az          = var.multi_az
 
   db_name  = var.db_name
   username = var.db_username
