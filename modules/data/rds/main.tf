@@ -14,6 +14,7 @@ resource "aws_db_instance" "primary" {
   instance_class    = var.instance_class
 
   availability_zone = var.azs[0]
+  multi_az          = true
 
   db_name  = var.db_name
   username = var.db_username
@@ -53,6 +54,7 @@ resource "aws_db_instance" "reservation" {
   instance_class    = var.instance_class
 
   availability_zone = var.azs[1]
+  multi_az          = true
 
   db_name  = var.db_name
   username = var.db_username
