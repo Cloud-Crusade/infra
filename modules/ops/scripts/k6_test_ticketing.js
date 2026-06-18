@@ -69,6 +69,7 @@ export function setup() {
 
 // VU 단위 상태 — k6 는 VU 마다 모듈 인스턴스를 분리하므로 반복(iteration) 간 유지된다.
 let userId = null;
+let token = null; // exp 1h 토큰 — VU 당 1회만 서명·재사용(폴링마다 HMAC 재연산 방지)
 let myQueueNumber = null;
 let lastRemaining = Infinity;
 let done = false;
@@ -86,12 +87,12 @@ function recordCompletionOnce() {
 
 export default function () {
     if (userId === null) userId = `user_${__VU}`;
+    if (token === null) token = generateTestToken(userId, CONFIG.JWT_SECRET_KEY); // 최초 1회만 서명
     if (done) { recordCompletionOnce(); sleep(POLL_INTERVAL_SECONDS); return; }
 
     if (startMs === null) startMs = Date.now();
     polls += 1;
 
-    const token = generateTestToken(userId, CONFIG.JWT_SECRET_KEY);
     const res = http.get(`${CONFIG.BASE_URL}/queue/${CONFIG.EVENT_ID}`, {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         timeout: '10s',
