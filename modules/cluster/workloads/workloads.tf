@@ -167,9 +167,10 @@ module "ticketing_service" {
   namespace = local.ticketing_namespace
   image     = local.ticketing_images[each.key]
 
-  replicas     = 1
-  min_replicas = 1
-  max_replicas = 3
+  # AZ 분산을 위해 서비스별 최소 2 파드(zone topologySpread 와 함께 양 AZ 병렬 배치)
+  replicas     = 2
+  min_replicas = 2
+  max_replicas = 4
 
   grpc_enabled = contains(["event", "reservation"], each.key)
   grpc_port    = local.grpc_port

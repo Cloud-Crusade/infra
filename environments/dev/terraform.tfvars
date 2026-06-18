@@ -35,9 +35,10 @@ eks_system_ng_max_size       = 2
 # app 노드 그룹 (dev: SPOT 활용으로 비용 절감 고려)
 eks_app_ng_instance_types = ["t3.medium"]
 eks_app_ng_capacity_type  = "ON_DEMAND" # TODO: dev는 SPOT 변경 고려
-eks_app_ng_desired_size   = 1
-eks_app_ng_min_size       = 1
-eks_app_ng_max_size       = 3
+# 2 AZ 병렬 배치 — 단일 노드그룹이 두 사설서브넷(AZ)에 노드를 분산하도록 desired/min=2
+eks_app_ng_desired_size = 2
+eks_app_ng_min_size     = 2
+eks_app_ng_max_size     = 4
 
 # TODO: 클러스터 접근이 필요한 IAM Role/User 추가
 eks_access_entries = []

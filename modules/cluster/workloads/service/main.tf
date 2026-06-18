@@ -51,6 +51,16 @@ resource "kubernetes_deployment_v1" "this" {
         }
         node_selector = { role = "app" }
 
+        # 파드를 가용영역(AZ)별로 병렬 분산 — AZ 장애/zonal shift 대비. 소프트(용량 부족 시에도 스케줄)
+        topology_spread_constraint {
+          max_skew           = 1
+          topology_key       = "topology.kubernetes.io/zone"
+          when_unsatisfiable = "ScheduleAnyway"
+          label_selector {
+            match_labels = local.labels
+          }
+        }
+
         security_context {
           run_as_non_root = true
           run_as_user     = 10001
