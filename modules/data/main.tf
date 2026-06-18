@@ -12,6 +12,7 @@ module "rds" {
   vpc_security_group_ids = [var.rds_sg_id]
   azs                    = var.availability_zones
   subnet_ids             = var.subnet_ids
+  multi_az               = var.enable_az_failover
 }
 
 module "rds_proxy" {

@@ -61,3 +61,9 @@ variable "cloudfront_domain_name" {
 variable "cloudfront_zone_id" {
   type = string
 }
+
+variable "enable_az_failover" {
+  description = "AZ Failover 모드 — NLB zonal shift(on)/cross-zone(off) 전환"
+  type        = bool
+  default     = false
+}

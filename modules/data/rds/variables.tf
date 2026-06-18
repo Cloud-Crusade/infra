@@ -56,3 +56,9 @@ variable "subnet_ids" {
   description = "DB 서브넷 그룹에 포함할 서브넷 ID 목록 (프라이빗)"
   type        = list(string)
 }
+
+variable "multi_az" {
+  description = "writer Multi-AZ 배치 여부. true 면 availability_zone 명시 불가(AWS 가 대기 AZ 자동 선택)"
+  type        = bool
+  default     = false
+}

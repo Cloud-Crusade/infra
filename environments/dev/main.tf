@@ -162,6 +162,8 @@ module "data" {
   authorization_secret_value    = random_password.authorization.result
   reservation_private_key_value = tls_private_key.reservation.private_key_pem
   captcha_hmac_secret_value     = random_password.captcha_hmac.result
+
+  enable_az_failover = var.enable_az_failover
 }
 
 # 클라이언트 정적 호스팅(CloudFront + www ACM). acm_www 는 us-east-1 전용 → aliased provider 전달
@@ -228,6 +230,8 @@ module "api" {
   route53_zone_id        = var.route53_zone_id
   cloudfront_domain_name = module.frontend.cloudfront_domain_name
   cloudfront_zone_id     = var.cloudfront_zone_id
+
+  enable_az_failover = var.enable_az_failover
 }
 
 # 공유/교차 레이어 — 관측성(cloudwatch) + 교차 SG 규칙 + NLB↔파드 바인딩.

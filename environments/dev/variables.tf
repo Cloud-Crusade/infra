@@ -267,6 +267,12 @@ variable "enable_nlb_binding" {
   default     = false
 }
 
+variable "enable_az_failover" {
+  description = "AZ Failover(NLB zonal shift + RDS Multi-AZ, 추후 ARC) 일괄 on/off. off 면 cross-zone 모드"
+  type        = bool
+  default     = false
+}
+
 # API GW 백엔드 선택 — eks(NLB→파드) | test_ec2(단일 nginx 게이트웨이, 디버깅·부하테스트)
 variable "api_backend" {
   description = "API Gateway 백엔드: eks | test_ec2"
