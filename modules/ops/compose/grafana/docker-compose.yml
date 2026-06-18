@@ -6,4 +6,8 @@ services:
     restart: always
     ports:
       - "3000:3000"
-      
+    environment:
+      # in-cluster Prometheus 엔드포인트 (port-forward 시 http://host.docker.internal:9090, 내부 LB 시 그 DNS)
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-http://localhost:9090}
+    volumes:
+      - ./provisioning:/etc/grafana/provisioning

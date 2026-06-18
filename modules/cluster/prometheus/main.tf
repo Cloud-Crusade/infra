@@ -16,6 +16,9 @@ resource "helm_release" "prometheus" {
       retention: "${var.retention_days}d"
       global:
         scrape_interval: "15s"
+      # k6 가 메트릭을 remote-write 로 푸시 → Grafana 에서 조회
+      extraFlags:
+        - web.enable-remote-write-receiver
       tolerations:
         - key: dedicated
           operator: Exists
