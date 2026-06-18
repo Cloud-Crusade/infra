@@ -124,9 +124,9 @@ module "cluster" {
   ecr_namespace = var.ecr_namespace
   ecr_registry  = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 
-  rds_core_writer_endpoint        = module.data.primary_endpoint
+  rds_core_writer_endpoint        = module.data.core_proxy_endpoint
   rds_core_reader_endpoint        = module.data.primary_replica_endpoint
-  rds_reservation_writer_endpoint = module.data.reservation_endpoint
+  rds_reservation_writer_endpoint = module.data.reservation_proxy_endpoint
   rds_reservation_reader_endpoint = module.data.reservation_replica_endpoint
   redis_main_endpoint             = module.data.main_cache_endpoint
 
@@ -149,6 +149,7 @@ module "data" {
   subnet_ids         = module.network.private_subnet_ids
   availability_zones = var.availability_zones
   rds_sg_id          = module.shared.rds_sg_id
+  rds_proxy_sg_id    = module.shared.rds_proxy_sg_id
   cache_sg_id        = module.shared.cache_sg_id
 
   db_name              = var.db_name
@@ -191,7 +192,7 @@ module "async" {
   vpc_subnet_ids              = module.network.private_subnet_ids
   secrets_extension_layer_arn = var.secrets_extension_layer_arn
 
-  reservation_endpoint               = module.data.reservation_endpoint
+  reservation_endpoint               = module.data.reservation_proxy_endpoint
   waiting_room_cache_endpoint        = module.data.waiting_room_cache_endpoint
   reservation_private_key_secret_arn = module.data.reservation_private_key_secret_arn
   authorization_secret_arn           = module.data.authorization_secret_arn
@@ -269,6 +270,10 @@ module "shared" {
   # EKS/APIGW 알람은 미활성 유지(활성화 = 리소스 추가 → 별도 PR)
   eks_cluster_name = ""
   api_gateway_name = ""
+
+  # ARC outcome 알람 dimension — NLB(api 레이어) 출력에서 직접 배선
+  lb_arn_suffix             = module.api.lb_arn_suffix
+  target_group_arn_suffixes = module.api.target_group_arn_suffixes
 
   secretsmanager_endpoint_security_group_id = module.network.secretsmanager_endpoint_security_group_id
   cluster_security_group_id                 = module.cluster.cluster_security_group_id

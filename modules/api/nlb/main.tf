@@ -73,6 +73,11 @@ resource "aws_lb_target_group" "svc" {
     unhealthy_threshold = 3
   }
 
+  target_failover {
+    on_deregistration = "no_rebalance"
+    on_unhealthy      = "no_rebalance"
+  }
+
   tags = {
     Environment = var.environment
   }

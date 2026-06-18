@@ -869,3 +869,45 @@ resource "aws_cloudwatch_dashboard" "main" {
     ]
   })
 }
+
+resource "aws_cloudwatch_metric_alarm" "arc_zonal_shift" {
+  alarm_name          = "arc-zonal-shift-alarm"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+
+  # 서비스별 TG UnHealthyHostCount (개별 메트릭, 합산 입력용)
+  dynamic "metric_query" {
+    for_each = var.target_group_arn_suffixes
+    iterator = tg
+
+    content {
+      id          = "m_${tg.key}"
+      return_data = false
+
+      metric {
+        metric_name = "UnHealthyHostCount"
+        namespace   = "AWS/NetworkELB"
+        period      = 60
+        stat        = "Maximum"
+
+        dimensions = {
+          LoadBalancer = var.lb_arn_suffix
+          TargetGroup  = tg.value
+        }
+      }
+    }
+  }
+
+  # 전체 TG 합산 — 어느 한 TG라도 unhealthy host 가 있으면 알람
+  metric_query {
+    id          = "total_unhealthy"
+    expression  = join(" + ", [for k in keys(var.target_group_arn_suffixes) : "m_${k}"])
+    label       = "TotalUnhealthyHosts"
+    return_data = true
+  }
+
+  alarm_description = "ARC Zonal Shift outcome alarm — NLB 전체 TG UnHealthyHostCount 합산"
+  actions_enabled   = false
+}

@@ -1,0 +1,13 @@
+# Grafana Prometheus 데이터소스 자동 프로비저닝.
+# URL 은 PROMETHEUS_URL 환경변수로 주입(노출 방식은 운영자 선택 — port-forward / 내부 LB).
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: ${PROMETHEUS_URL}
+    isDefault: true
+    jsonData:
+      timeInterval: 15s
