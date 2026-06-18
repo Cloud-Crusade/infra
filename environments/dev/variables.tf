@@ -60,10 +60,6 @@ variable "allowed_ssh_cidrs" {
 
 # ===== Bastion =====
 
-variable "bastion_ami" {
-  description = "Bastion Host AMI"
-  type        = string
-}
 
 variable "bastion_instance_type" {
   description = "Bastion host 인스턴스 타입"
@@ -74,20 +70,6 @@ variable "bastion_instance_type" {
 variable "bastion_key_name" {
   description = "Bastion Host SSH 키페어 이름"
   type        = string
-}
-
-# ===== IAM =====
-
-variable "oidc_provider_arn" {
-  description = "EKS OIDC Provider ARN"
-  type        = string
-  default     = ""
-}
-
-variable "oidc_provider_url" {
-  description = "EKS OIDC Provider URL"
-  type        = string
-  default     = ""
 }
 
 # ===== RDS =====
@@ -182,3 +164,164 @@ variable "captcha_enabled" {
   default     = false
 }
 
+
+# ============================================================
+# EKS
+# ============================================================
+variable "eks_cluster_version" {
+  description = "Kubernetes 버전"
+  type        = string
+}
+
+variable "eks_endpoint_public_access" {
+  type    = bool
+  default = true
+}
+
+variable "eks_endpoint_private_access" {
+  type    = bool
+  default = true
+}
+
+variable "eks_endpoint_public_access_cidrs" {
+  type    = list(string)
+  default = ["0.0.0.0/0"]
+}
+
+variable "eks_enabled_log_types" {
+  type    = list(string)
+  default = ["api", "audit", "authenticator"]
+}
+
+variable "eks_system_ng_instance_types" {
+  type    = list(string)
+  default = ["t3.medium"]
+}
+
+variable "eks_system_ng_capacity_type" {
+  type    = string
+  default = "ON_DEMAND"
+}
+
+variable "eks_system_ng_desired_size" {
+  type    = number
+  default = 1
+}
+
+variable "eks_system_ng_min_size" {
+  type    = number
+  default = 1
+}
+
+variable "eks_system_ng_max_size" {
+  type    = number
+  default = 2
+}
+
+variable "eks_app_ng_instance_types" {
+  type    = list(string)
+  default = ["t3.medium"]
+}
+
+variable "eks_app_ng_capacity_type" {
+  type    = string
+  default = "ON_DEMAND"
+}
+
+variable "eks_app_ng_desired_size" {
+  type    = number
+  default = 1
+}
+
+variable "eks_app_ng_min_size" {
+  type    = number
+  default = 1
+}
+
+variable "eks_app_ng_max_size" {
+  type    = number
+  default = 3
+}
+
+variable "ticketing_image_tag" {
+  description = "EKS 워크로드 초기 이미지 태그 (이후 롤아웃은 cc/app CD 가 갱신 → image 변경은 terraform ignore)"
+  type        = string
+  default     = "latest"
+}
+
+variable "eks_access_entries" {
+  type = list(object({
+    principal_arn     = string
+    kubernetes_groups = optional(list(string), [])
+    type              = optional(string, "STANDARD")
+    policy_arn        = optional(string, null)
+  }))
+  default = []
+}
+
+# TargetGroupBinding(kubernetes_manifest)은 plan 시 클러스터+CRD 접속이 필요 → clean-room plan 에선 false.
+# LB Controller(CRD) 설치 후 2단계로 true 적용(TF_VAR_enable_nlb_binding=true).
+variable "enable_nlb_binding" {
+  description = "NLB 타겟그룹 ↔ 파드 IP TargetGroupBinding 생성 여부"
+  type        = bool
+  default     = false
+}
+
+# API GW 백엔드 선택 — eks(NLB→파드) | test_ec2(단일 nginx 게이트웨이, 디버깅·부하테스트)
+variable "api_backend" {
+  description = "API Gateway 백엔드: eks | test_ec2"
+  type        = string
+  default     = "eks"
+  validation {
+    condition     = contains(["eks", "test_ec2"], var.api_backend)
+    error_message = "api_backend 는 'eks' 또는 'test_ec2' 여야 합니다."
+  }
+}
+
+# ticketing 서비스 수신 포트 단일 소스 — NLB 타겟그룹 port·파드 SG 인바운드·TargetGroupBinding serviceRef 가 공유.
+# eks 서비스 모듈 http_port(기본 8000)와 일치해야 함.
+variable "ticketing_http_port" {
+  description = "ticketing 서비스 HTTP 포트 (NLB 타겟·SG·TargetGroupBinding 공통)"
+  type        = number
+  default     = 8000
+}
+
+# ===== ops / test_ec2 (테스트 픽스처) =====
+variable "test_image_registry" {
+  description = "ECR 레지스트리 override. 미설정 시 현재 계정·리전에서 파생"
+  type        = string
+  default     = ""
+}
+
+variable "ecr_namespace" {
+  description = "ECR 리포지토리 네임스페이스 prefix (cc/app CD vars.ECR_NAMESPACE 와 동일)"
+  type        = string
+  default     = "ticketing"
+}
+
+variable "test_image_tag" {
+  type    = string
+  default = "latest"
+}
+
+variable "test_service_port" {
+  description = "nginx 게이트웨이 포트 (API Gateway 백엔드). 서비스 직접 포트는 +1..+4"
+  type        = number
+  default     = 8000
+}
+
+variable "test_ec2_instance_type" {
+  type    = string
+  default = "t3.small"
+}
+
+variable "test_ec2_root_volume_gb" {
+  type    = number
+  default = 30
+}
+
+variable "test_service_ingress_cidrs" {
+  description = "서비스 포트 인바운드 허용 CIDR (테스트 편의상 기본 전체 — 운영 금지)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}

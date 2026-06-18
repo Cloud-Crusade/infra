@@ -1,0 +1,18 @@
+#!/bin/bash
+# docker compose 플러그인 설치
+mkdir -p /usr/libexec/docker/cli-plugins/
+curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
+chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+
+# scripts/ · compose/ 전체 파일을 구조 보존해 배치 (base64 인라인 — fileset 으로 자동 포함)
+%{ for path, content in ops_files ~}
+mkdir -p "/home/ec2-user/ops/$(dirname "${path}")"
+echo "${content}" | base64 -d > "/home/ec2-user/ops/${path}"
+%{ endfor ~}
+chown -R ec2-user:ec2-user /home/ec2-user/ops
+
+# xk6-sql 커스텀 k6 이미지 사전 빌드(최초 1회, 실패해도 부팅 계속)
+cd /home/ec2-user/ops/compose/k6 && docker compose build k6-sql || true
+
+# grafana 실행 (PROMETHEUS_URL 은 운영자가 노출 방식에 맞춰 주입)
+cd /home/ec2-user/ops/compose/grafana && docker compose up -d

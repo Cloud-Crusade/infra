@@ -8,14 +8,14 @@
 이슈 타이틀 형태: `[카테고리]: 이슈 제목`
 
 카테고리
-- Feature: 기능 추가, 기능 변경
-- Refactor: 리팩토링, 구조 변경
-- Bug: 발생한 버그 목록
-- Chore: 의존성, 문서 작업 등 코드 외 작업 (별도의 의존성 작업만 추가할 경우)
+- FEATURE: 기능 추가, 기능 변경
+- REFACTOR: 리팩토링, 구조 변경
+- BUG: 발생한 버그 목록
+- CHORE: 의존성, 문서 작업 등 코드 외 작업 (별도의 의존성 작업만 추가할 경우)
 
 EX
-`[Feature] OAuth 2.0 추가`
-`[Refactor] Ansible 모듈 리팩토링`
+`[FEATURE] OAuth 2.0 추가`
+`[REFACTOR] Ansible 모듈 리팩토링`
 
 ### Branch
 브랜치 이름 형태: `카테고리/#이슈번호/브랜치명`

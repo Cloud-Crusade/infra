@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      # in-cluster Prometheus 엔드포인트. 기본은 bastion 호스트의 port-forward(9090) — scripts/prometheus_portforward.sh
+      # 내부 LB 사용 시 그 사설 DNS 로 PROMETHEUS_URL 주입
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-http://host.docker.internal:9090}
+    extra_hosts:
+      # 컨테이너에서 bastion 호스트(=port-forward 리스너)에 닿기 위함
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./provisioning:/etc/grafana/provisioning
