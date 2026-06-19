@@ -16,6 +16,12 @@ variable "vpc_id" {
   type = string
 }
 
+# prometheus server internal NLB source-ranges (VPC 내부 접근 허용)
+variable "vpc_cidr" {
+  type    = string
+  default = ""
+}
+
 # ================== eks 클러스터 ==================
 variable "subnet_ids" {
   type = list(string)

@@ -14,5 +14,50 @@ chown -R ec2-user:ec2-user /home/ec2-user/ops
 # xk6-sql 커스텀 k6 이미지 사전 빌드(최초 1회, 실패해도 부팅 계속)
 cd /home/ec2-user/ops/compose/k6 && docker compose build k6-sql || true
 
-# grafana 실행 (PROMETHEUS_URL 은 운영자가 노출 방식에 맞춰 주입)
+# grafana 실행 (PROMETHEUS_URL 은 아래 refresh 가 NLB DNS 해석 후 .env 로 주입)
 cd /home/ec2-user/ops/compose/grafana && docker compose up -d
+
+# ---- Prometheus internal NLB DNS 런타임 해석 → compose .env 주입(재생성 자동 추종) ----
+cat > /usr/local/bin/refresh-monitoring.sh <<'EOS'
+#!/bin/bash
+set -e
+LB_NAME="${prometheus_lb_name}"
+REGION="${aws_region}"
+GDIR=/home/ec2-user/ops/compose/grafana
+KDIR=/home/ec2-user/ops/compose/k6
+DNS=$(aws elbv2 describe-load-balancers --region "$REGION" --names "$LB_NAME" --query 'LoadBalancers[0].DNSName' --output text 2>/dev/null || true)
+if [ -z "$DNS" ] || [ "$DNS" = "None" ]; then
+  echo "prometheus NLB($LB_NAME) 미존재 — 대기"
+  exit 0
+fi
+URL="http://$DNS"
+LINE="PROMETHEUS_URL=$URL"
+if ! grep -qxF "$LINE" "$GDIR/.env" 2>/dev/null; then
+  echo "$LINE" > "$GDIR/.env"
+  mkdir -p "$KDIR" && echo "K6_PROMETHEUS_RW_SERVER_URL=$URL/api/v1/write" > "$KDIR/.env"
+  chown ec2-user:ec2-user "$GDIR/.env" "$KDIR/.env" 2>/dev/null || true
+  cd "$GDIR" && docker compose up -d
+  echo "PROMETHEUS_URL=$URL 적용 + grafana 재기동"
+fi
+EOS
+chmod +x /usr/local/bin/refresh-monitoring.sh
+
+cat > /etc/systemd/system/refresh-monitoring.service <<'EOS'
+[Unit]
+Description=Resolve Prometheus NLB DNS and (re)start Grafana
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/refresh-monitoring.sh
+EOS
+cat > /etc/systemd/system/refresh-monitoring.timer <<'EOS'
+[Unit]
+Description=Periodic Prometheus NLB refresh
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=180
+[Install]
+WantedBy=timers.target
+EOS
+systemctl daemon-reload
+systemctl enable --now refresh-monitoring.timer

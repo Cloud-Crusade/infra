@@ -37,3 +37,10 @@ variable "retention_days" {
   type        = number
   default     = 15
 }
+
+# bastion(Grafana/k6)에서 접근하도록 server 를 internal NLB 로 노출
+variable "vpc_cidr" {
+  description = "internal NLB source-ranges (VPC 내부만 허용)"
+  type        = string
+  default     = ""
+}

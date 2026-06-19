@@ -97,6 +97,7 @@ module "cluster" {
 
   subnet_ids = module.network.private_subnet_ids
   eks_sg_id  = module.shared.eks_sg_id
+  vpc_cidr   = module.network.vpc_cidr
 
   cluster_version                      = var.eks_cluster_version
   cluster_endpoint_public_access       = var.eks_endpoint_public_access
