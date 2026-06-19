@@ -1,0 +1,40 @@
+name: Terraform apply (retry)
+description: 전이적 타임아웃/가용성(RDS Multi-AZ·helm wait) 대비 자동 재시도 apply. apply 는 멱등·resumable.
+
+inputs:
+  working-directory:
+    description: terraform 디렉터리
+    required: true
+  enable-nlb-binding:
+    description: nlb_binding(kubernetes_manifest) 활성화 여부 (TF_VAR_enable_nlb_binding)
+    required: false
+    default: "false"
+  extra-args:
+    description: apply 추가 인자 (targeted/복구용)
+    required: false
+    default: ""
+  max-retries:
+    description: 최대 재시도 횟수
+    required: false
+    default: "3"
+  label:
+    description: 로그 표식
+    required: false
+    default: apply
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        TF_VAR_enable_nlb_binding: ${{ inputs.enable-nlb-binding }}
+      run: |
+        set +e
+        n=0; max=${{ inputs.max-retries }}
+        until terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra-args }}; do
+          n=$((n + 1))
+          [ "$n" -ge "$max" ] && { echo "::error::${{ inputs.label }} $max 회 실패"; exit 1; }
+          echo "::warning::${{ inputs.label }} 실패 — ${n}/${max}, 120s 후 재시도(전이적 타임아웃 대비)"
+          sleep 120
+        done
