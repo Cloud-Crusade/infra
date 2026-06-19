@@ -19,6 +19,11 @@ resource "aws_eks_cluster" "this" {
 
   enabled_cluster_log_types = var.cluster_enabled_log_types
 
+  # access entry 기반 접근 허용(운영자/CD) — CONFIG_MAP 도 유지(상위호환). 생성자(CD)는 bootstrap admin
+  access_config {
+    authentication_mode = "API_AND_CONFIG_MAP"
+  }
+
   # 컨트롤플레인 기동 전 클러스터 정책 연결 보장
   depends_on = [aws_iam_role_policy_attachment.eks_cluster]
 }
