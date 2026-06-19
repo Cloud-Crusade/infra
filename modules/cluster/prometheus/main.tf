@@ -12,6 +12,9 @@ resource "helm_release" "prometheus" {
   # cold-start(EBS CSI·PVC 바인딩) 여유 + 실패 시 고아 릴리스 잔존 방지
   timeout         = 600
   cleanup_on_fail = true
+  # internal NLB/pod ready 를 helm 이 기다리지 않음 — LB 프로비저닝 지연으로 인한 타임아웃·고아
+  # 릴리스 재발 방지. NLB 준비는 bastion timer 가 비동기 추종(refresh-monitoring).
+  wait = false
 
   # 노드그룹 dedicated taint(system·app) 통과 — 컴포넌트/서브차트별 tolerations
   values = [
