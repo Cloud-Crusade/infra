@@ -141,6 +141,38 @@ resource "aws_api_gateway_integration" "reservation_item" {
   }
 }
 
+# ===== /reservations/seats/occupied — 점유 좌석 조회(GET): access 토큰만(입장 토큰 불필요) =====
+resource "aws_api_gateway_resource" "seats" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_resource.reservations.id
+  path_part   = "seats"
+}
+
+resource "aws_api_gateway_resource" "seats_occupied" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_resource.seats.id
+  path_part   = "occupied"
+}
+
+resource "aws_api_gateway_method" "seats_occupied" {
+  rest_api_id   = aws_api_gateway_rest_api.this.id
+  resource_id   = aws_api_gateway_resource.seats_occupied.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "seats_occupied" {
+  rest_api_id             = aws_api_gateway_rest_api.this.id
+  resource_id             = aws_api_gateway_resource.seats_occupied.id
+  http_method             = aws_api_gateway_method.seats_occupied.http_method
+  type                    = "HTTP_PROXY"
+  integration_http_method = "GET"
+  connection_type         = local.conn_type
+  connection_id           = local.conn_id
+  # HTTP_PROXY 는 쿼리스트링(?event_id=)을 그대로 전달
+  uri = "${local.svc_base["reservation"]}/reservations/seats/occupied"
+}
+
 # ===== /reservations* CORS 프리플라이트 =====
 # 명시 리소스라 OPTIONS 를 직접 정의해야 함. authorization=NONE + MOCK 으로 CORS 헤더만 반환
 # (POST 의 CUSTOM authorizer 는 프리플라이트(헤더 없음)를 거부하므로 OPTIONS 를 분리).
@@ -149,6 +181,7 @@ locals {
     {
       reservations     = aws_api_gateway_resource.reservations.id
       reservation_item = aws_api_gateway_resource.reservation_item.id
+      seats_occupied   = aws_api_gateway_resource.seats_occupied.id
     },
     { for k, r in aws_api_gateway_resource.svc_root : "${k}_root" => r.id },
     { for k, r in aws_api_gateway_resource.svc_proxy : "${k}_proxy" => r.id },
@@ -354,6 +387,8 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_integration.reservations_get.id,
       aws_api_gateway_method.queue.id,
       aws_api_gateway_integration.queue.id,
+      aws_api_gateway_method.seats_occupied.id,
+      aws_api_gateway_integration.seats_occupied.id,
       local.conn_id,
       var.backend,
       jsonencode(local.svc_base),
@@ -399,6 +434,8 @@ resource "aws_api_gateway_deployment" "this" {
     aws_api_gateway_integration_response.cors,
     aws_api_gateway_method.queue,
     aws_api_gateway_integration.queue,
+    aws_api_gateway_method.seats_occupied,
+    aws_api_gateway_integration.seats_occupied,
     aws_api_gateway_method.captcha_challenge,
     aws_api_gateway_integration.captcha_challenge,
     aws_api_gateway_integration.svc_root,
