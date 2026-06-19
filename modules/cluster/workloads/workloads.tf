@@ -123,9 +123,15 @@ resource "kubernetes_service_v1" "redis_main" {
   depends_on = [kubernetes_namespace_v1.ticketing]
 }
 
-# reservation 만 SQS produce → IRSA 로 SendMessage 권한 (나머지 서비스는 권한 불필요).
+# SQS produce 서비스(reservation·payment) → IRSA 로 SendMessage 권한. 나머지 서비스는 권한 불필요.
+# (payment 도 결제 이벤트를 SQS publish 하므로 reservation 과 함께 포함 — 미포함 시 NoCredentialsError→500)
 # OIDC provider 는 이 모듈이 생성하므로 내부 리소스 직접 참조(issuer 의 https:// 제거 후 sub 컨디션)
-data "aws_iam_policy_document" "reservation_irsa_assume" {
+locals {
+  sqs_producers = ["reservation", "payment"]
+}
+
+data "aws_iam_policy_document" "svc_irsa_assume" {
+  for_each = toset(local.sqs_producers)
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -136,19 +142,21 @@ data "aws_iam_policy_document" "reservation_irsa_assume" {
     condition {
       test     = "StringEquals"
       variable = "${replace(var.oidc_issuer_url, "https://", "")}:sub"
-      values   = ["system:serviceaccount:${local.ticketing_namespace}:ticketing-reservation"]
+      values   = ["system:serviceaccount:${local.ticketing_namespace}:ticketing-${each.key}"]
     }
   }
 }
 
-resource "aws_iam_role" "reservation_irsa" {
-  name               = "${var.project_name}-${var.environment}-ticketing-reservation-irsa"
-  assume_role_policy = data.aws_iam_policy_document.reservation_irsa_assume.json
+resource "aws_iam_role" "svc_irsa" {
+  for_each           = toset(local.sqs_producers)
+  name               = "${var.project_name}-${var.environment}-ticketing-${each.key}-irsa"
+  assume_role_policy = data.aws_iam_policy_document.svc_irsa_assume[each.key].json
 }
 
-resource "aws_iam_role_policy" "reservation_sqs" {
-  name = "sqs-send"
-  role = aws_iam_role.reservation_irsa.id
+resource "aws_iam_role_policy" "svc_sqs" {
+  for_each = toset(local.sqs_producers)
+  name     = "sqs-send"
+  role     = aws_iam_role.svc_irsa[each.key].id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -157,6 +165,16 @@ resource "aws_iam_role_policy" "reservation_sqs" {
       Resource = var.sqs_queue_arn
     }]
   })
+}
+
+# 기존 reservation 전용 리소스 → producer 집합으로 일반화(물리 동일, state 주소만 이전)
+moved {
+  from = aws_iam_role.reservation_irsa
+  to   = aws_iam_role.svc_irsa["reservation"]
+}
+moved {
+  from = aws_iam_role_policy.reservation_sqs
+  to   = aws_iam_role_policy.svc_sqs["reservation"]
 }
 
 module "ticketing_service" {
@@ -183,7 +201,7 @@ module "ticketing_service" {
 
   extra_env = lookup(local.svc_grpc_targets, each.key, {})
 
-  irsa_role_arn = each.key == "reservation" ? aws_iam_role.reservation_irsa.arn : ""
+  irsa_role_arn = contains(local.sqs_producers, each.key) ? aws_iam_role.svc_irsa[each.key].arn : ""
 
   depends_on = [kubernetes_job_v1.db_bootstrap]
 }
