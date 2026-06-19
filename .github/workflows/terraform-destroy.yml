@@ -1,4 +1,4 @@
-name: Terraform Apply / Destroy
+name: Terraform Destroy
 
 on:
   workflow_dispatch:
@@ -9,35 +9,10 @@ on:
         options:
           - dev
           - prod
-      action:
-        description: 실행 작업
-        type: choice
-        options:
-          - apply
-          - destroy
-      api_backend:
-        description: API GW 백엔드 (dev apply 전용 — prod 는 무시)
-        type: choice
-        default: eks
-        options:
-          - eks
-          - test_ec2
-      enable_az_failover:
-        description: AZ Failover (NLB zonal shift + RDS Multi-AZ + ARC). enable_cloudwatch=true 필요
-        type: boolean
-        default: false
-      enable_cloudwatch:
-        description: CloudWatch 사용 (알람·대시보드·컨트롤플레인/APIGW 로그). off 시 부하테스트 비용 절감
-        type: boolean
-        default: true
-      extra_apply_args:
-        description: apply 추가 인자 (targeted/복구용, 예 "-refresh=false -replace=...")
-        type: string
-        default: ""
 
 jobs:
-  terraform:
-    name: Terraform ${{ inputs.action }} (${{ inputs.environment }})
+  destroy:
+    name: Terraform Destroy (${{ inputs.environment }})
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
 
@@ -72,34 +47,12 @@ jobs:
         working-directory: environments/${{ inputs.environment }}
         run: terraform init -input=false
 
-      - name: Terraform apply
-        if: inputs.action == 'apply'
-        working-directory: environments/${{ inputs.environment }}
-        env:
-          TF_VAR_api_backend: ${{ inputs.api_backend }}
-          TF_VAR_enable_nlb_binding: "false"
-          TF_VAR_enable_az_failover: ${{ inputs.enable_az_failover }}
-          TF_VAR_enable_cloudwatch: ${{ inputs.enable_cloudwatch }}
-        run: terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}
-
-      # kubernetes_manifest(nlb_binding)는 클러스터·CRD 가 존재해야 plan 가능 → 위 apply 이후 2단계로 생성
-      - name: Terraform apply (NLB binding)
-        if: inputs.action == 'apply' && inputs.environment == 'dev' && inputs.api_backend == 'eks'
-        working-directory: environments/${{ inputs.environment }}
-        env:
-          TF_VAR_api_backend: ${{ inputs.api_backend }}
-          TF_VAR_enable_nlb_binding: "true"
-          TF_VAR_enable_az_failover: ${{ inputs.enable_az_failover }}
-          TF_VAR_enable_cloudwatch: ${{ inputs.enable_cloudwatch }}
-        run: terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}
-
-      # destroy 는 ①람다 → ②ENI drain → ③전체 의 staged 단계로 분리.
+      # destroy 는 ①람다 → ②ENI drain → ③finalizer → ④전체 의 staged 단계로 분리.
       # VPC 람다 ENI 가 분리 안 된 채 잔존하면 SG·서브넷 삭제를 DependencyViolation 으로 장시간 막음
 
       # lambda SG 를 state 에서 결정적으로 식별(이름 추정·와일드카드 회피). 없으면(prod 등) staged 단계 생략
       - name: Resolve Lambda security group
         id: lambda_sg
-        if: inputs.action == 'destroy'
         working-directory: environments/${{ inputs.environment }}
         env:
           SG_ADDR: module.security_groups.aws_security_group.lambda
@@ -118,14 +71,14 @@ jobs:
 
       # ① VPC 연결 람다부터 제거 → AWS 가 ENI 회수 시작
       - name: Destroy Lambda first
-        if: inputs.action == 'destroy' && steps.lambda_sg.outputs.sg_id != ''
+        if: steps.lambda_sg.outputs.sg_id != ''
         working-directory: environments/${{ inputs.environment }}
         run: terraform destroy -target=module.lambda -auto-approve -input=false -lock-timeout=5m
 
       # ② lambda SG 의 VPC Lambda ENI(interface-type=lambda) 강제 분리·삭제.
       # 관리형(Hyperplane)이면 분리가 거부되므로 AWS 회수 폴링, 30분 타임아웃 시 state rm 폴백
       - name: Drain Lambda ENIs
-        if: inputs.action == 'destroy' && steps.lambda_sg.outputs.sg_id != ''
+        if: steps.lambda_sg.outputs.sg_id != ''
         env:
           SG_ID: ${{ steps.lambda_sg.outputs.sg_id }}
           SG_ADDR: module.security_groups.aws_security_group.lambda
@@ -156,29 +109,57 @@ jobs:
             sleep 30
           done
 
-      # TargetGroupBinding finalizer 강제 제거 — teardown 중 컨트롤러가 finalizer 를 못 지워
-      # kubernetes_manifest(nlb_binding) 삭제가 무한 대기하는 교착 방지(순서 의존만으론 부족).
-      # 어차피 NLB·타겟그룹도 삭제되므로 타겟 정상 해제는 불필요. 클러스터 부재 시 생략.
-      - name: Strip TargetGroupBinding finalizers
-        if: inputs.action == 'destroy'
+      # ③ LB Controller 관리 리소스 finalizer 강제 제거 — teardown 중 컨트롤러가 finalizer 를
+      # 못 지워 삭제가 무한 대기하는 교착 방지(TargetGroupBinding + LoadBalancer Service).
+      # 어차피 NLB·타겟그룹도 삭제되므로 정상 해제는 불필요. 클러스터 부재 시 생략.
+      - name: Strip LB controller finalizers
         continue-on-error: true
         run: |
           set +e
           CL="$(aws eks list-clusters --query "clusters[?ends_with(@, '-${{ inputs.environment }}-eks')] | [0]" --output text 2>/dev/null)"
           if [ -z "$CL" ] || [ "$CL" = "None" ]; then echo "EKS 클러스터 없음 — 생략"; exit 0; fi
           aws eks update-kubeconfig --name "$CL" >/dev/null 2>&1 || { echo "kubeconfig 실패 — 생략"; exit 0; }
+          # TargetGroupBinding finalizer 제거
           kubectl get targetgroupbinding -A \
             -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null \
           | while read -r t; do
               [ -z "$t" ] && continue
               ns="${t%%/*}"; name="${t##*/}"
               kubectl patch targetgroupbinding "$name" -n "$ns" --type=merge \
-                -p '{"metadata":{"finalizers":null}}' 2>/dev/null && echo "finalizer 제거: $t"
+                -p '{"metadata":{"finalizers":null}}' 2>/dev/null && echo "TGB finalizer 제거: $t"
             done
-          echo "TGB finalizer 정리 완료"
+          # LoadBalancer 타입 Service finalizer 제거(예: prometheus internal NLB)
+          kubectl get svc -A \
+            -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null \
+          | while read -r s; do
+              [ -z "$s" ] && continue
+              ns="${s%%/*}"; name="${s##*/}"
+              kubectl patch svc "$name" -n "$ns" --type=merge \
+                -p '{"metadata":{"finalizers":null}}' 2>/dev/null && echo "LB svc finalizer 제거: $s"
+            done
+          echo "finalizer 정리 완료"
 
-      # ③ 나머지(또는 SG 없으면 전체) destroy — SG·nlb_binding 이 막힘 없이 삭제됨
+      # ④ 전체 destroy — 실패 시 EKS 고아 리소스(클러스터 삭제 후 잔존) 정리 후 1회 재시도.
+      # EKS 가 자동 생성하는 CNI 보조 ENI(aws-K8S-*, available) 와 클러스터 SG(eks-cluster-sg-*,
+      # aws:eks:cluster-name 태그)는 terraform 미관리라 클러스터 삭제 후 고아로 남아 서브넷/VPC
+      # 삭제를 DependencyViolation 으로 막음 → 정리 후 재시도하면 통과.
       - name: Terraform destroy
-        if: inputs.action == 'destroy'
         working-directory: environments/${{ inputs.environment }}
-        run: terraform destroy -auto-approve -input=false -lock-timeout=5m
+        run: |
+          set +e
+          terraform destroy -auto-approve -input=false -lock-timeout=5m && exit 0
+          echo "::warning::1차 destroy 실패 — EKS 고아 ENI/SG 정리 후 재시도"
+          VPC="$(terraform state pull | jq -r '[.resources[]|select(.type=="aws_vpc")][0].instances[0].attributes.id // empty')"
+          if [ -n "$VPC" ]; then
+            echo "VPC=$VPC 고아 리소스 정리"
+            # CNI 보조 ENI(available) 삭제
+            for eni in $(aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=$VPC" "Name=status,Values=available" --query 'NetworkInterfaces[].NetworkInterfaceId' --output text 2>/dev/null); do
+              aws ec2 delete-network-interface --network-interface-id "$eni" 2>/dev/null && echo "ENI 삭제: $eni"
+            done
+            # EKS 소유 고아 SG(terraform 미관리) 삭제
+            for sg in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC" "Name=tag-key,Values=aws:eks:cluster-name" --query 'SecurityGroups[].GroupId' --output text 2>/dev/null); do
+              aws ec2 delete-security-group --group-id "$sg" 2>/dev/null && echo "SG 삭제: $sg"
+            done
+          fi
+          set -e
+          terraform destroy -auto-approve -input=false -lock-timeout=5m
