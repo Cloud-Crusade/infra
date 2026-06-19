@@ -4,11 +4,9 @@ mkdir -p /usr/libexec/docker/cli-plugins/
 curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
 chmod +x /usr/libexec/docker/cli-plugins/docker-compose
 
-# scripts/ · compose/ 전체 파일을 구조 보존해 배치 (base64 인라인 — fileset 으로 자동 포함)
-%{ for path, content in ops_files ~}
-mkdir -p "/home/ec2-user/ops/$(dirname "${path}")"
-echo "${content}" | base64 -d > "/home/ec2-user/ops/${path}"
-%{ endfor ~}
+# scripts/ · compose/ 전체 파일을 S3 에서 동기화 (user_data 16KB 한도 회피 — 인라인 대신 S3 sync)
+mkdir -p /home/ec2-user/ops
+aws s3 sync "s3://${ops_bucket}/${ops_prefix}/" /home/ec2-user/ops/ --region ${aws_region}
 chown -R ec2-user:ec2-user /home/ec2-user/ops
 
 # xk6-sql 커스텀 k6 이미지 사전 빌드(최초 1회, 실패해도 부팅 계속)

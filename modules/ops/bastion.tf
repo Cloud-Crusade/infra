@@ -50,6 +50,28 @@ resource "aws_iam_role_policy" "bastion_elb_describe" {
   })
 }
 
+# 부팅 시 ops 파일 S3 sync 용 읽기 권한
+resource "aws_iam_role_policy" "bastion_s3_ops" {
+  name = "s3-ops-read"
+  role = aws_iam_role.bastion.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = "arn:aws:s3:::${local.ops_bucket}/bastion/${var.environment}/ops/*"
+      },
+      {
+        Effect    = "Allow"
+        Action    = ["s3:ListBucket"]
+        Resource  = "arn:aws:s3:::${local.ops_bucket}"
+        Condition = { StringLike = { "s3:prefix" = "bastion/${var.environment}/ops/*" } }
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "bastion" {
   name = "${var.project_name}-${var.environment}-bastion-profile"
   role = aws_iam_role.bastion.name
@@ -68,13 +90,29 @@ resource "aws_instance" "bastion" {
     Name = "${var.project_name}-${var.environment}-bastion"
   }
 
-  # scripts/ · compose/ 전체 파일을 인라인 배치(부팅 시). fileset 으로 자동 포함.
-  # gzip 압축(base64) — user_data 16KB 제한 회피(cloud-init 가 자동 해제). 더 커지면 S3 sync 로 전환.
+  # ops 파일(scripts/·compose/)은 S3 에 업로드하고 부팅 시 sync — user_data 16KB 한도 회피(인라인 대신).
   user_data_base64 = base64gzip(templatefile("${path.module}/templates/bastion_user_data.sh.tftpl", {
-    ops_files          = { for f in fileset(path.module, "{scripts,compose}/**") : f => filebase64("${path.module}/${f}") }
+    ops_bucket         = local.ops_bucket
+    ops_prefix         = "bastion/${var.environment}/ops"
     prometheus_lb_name = "${var.project_name}-${var.environment}-prometheus"
     aws_region         = var.aws_region
   }))
+
+  # 부팅 전 ops 파일이 S3 에 존재하도록 보장
+  depends_on = [aws_s3_object.ops]
+}
+
+# scripts/·compose/ 전체 파일을 S3 에 업로드(부팅 시 bastion 이 sync). state 버킷 재사용.
+locals {
+  ops_bucket = "tfstate-bucket-d8f5bb8d" # backend.tf 의 state 버킷
+}
+
+resource "aws_s3_object" "ops" {
+  for_each = fileset(path.module, "{scripts,compose}/**")
+  bucket   = local.ops_bucket
+  key      = "bastion/${var.environment}/ops/${each.value}"
+  source   = "${path.module}/${each.value}"
+  etag     = filemd5("${path.module}/${each.value}")
 }
 
 # bastion 개인키를 backend(state) 와 동일한 S3 버킷에 업로드 (팀 SSH 접근용)
