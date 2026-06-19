@@ -73,7 +73,7 @@ jobs:
       - name: Destroy Lambda first
         if: steps.lambda_sg.outputs.sg_id != ''
         working-directory: environments/${{ inputs.environment }}
-        run: terraform destroy -target=module.lambda -auto-approve -input=false -lock-timeout=5m
+        run: terraform destroy -target=module.async.module.lambda -auto-approve -input=false -lock-timeout=5m
 
       # ② lambda SG 에 붙은 VPC Lambda ENI 강제 분리·삭제. interface-type 으로 거르지 않음 —
       # 람다 VPC ENI 는 Hyperplane(interface-type=lambda)·일반(interface-type=interface) 둘 다 나타나며,
