@@ -10,6 +10,14 @@ resource "aws_security_group" "bastion" {
     cidr_blocks = var.allowed_ssh_cidrs
   }
 
+  # Grafana(compose 3000) 직접 접속 — SSH 와 동일 신뢰 범위. allowed_ssh_cidrs 가 넓으면 노출 주의
+  ingress {
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_ssh_cidrs
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
