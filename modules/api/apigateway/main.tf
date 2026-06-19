@@ -152,6 +152,8 @@ locals {
     },
     { for k, r in aws_api_gateway_resource.svc_root : "${k}_root" => r.id },
     { for k, r in aws_api_gateway_resource.svc_proxy : "${k}_proxy" => r.id },
+    # captcha/challenge 는 공개 GET 이나 브라우저 CORS preflight(OPTIONS) 필요 → 캡차 로드/예매 제출 차단 방지
+    var.enable_captcha_route ? { captcha_challenge = aws_api_gateway_resource.captcha_challenge[0].id } : {},
   )
   # 헤더 값을 한 곳에서 정의 → integration_response 와 배포 트리거가 같은 출처 참조(값 변경 시 재배포)
   cors_response_headers = {
