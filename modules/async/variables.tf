@@ -53,3 +53,8 @@ variable "db_password" {
   type      = string
   sensitive = true
 }
+
+variable "blacklist_cache_endpoint" {
+  type        = string
+  description = "bot_block 람다가 IP 블랙리스트를 저장·조회하는 Redis 엔드포인트"
+}

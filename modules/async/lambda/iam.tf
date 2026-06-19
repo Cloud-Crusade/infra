@@ -42,6 +42,21 @@ resource "aws_iam_policy" "secrets" {
   })
 }
 
+# CloudWatch Logs Insights 조회(bot_block 람다 — 의심 IP 탐지)
+resource "aws_iam_policy" "logs_query" {
+  name        = "${var.project_name}-lambda-logs-query-policy"
+  description = "Lambda policy for CloudWatch Logs Insights query"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["logs:StartQuery", "logs:GetQueryResults"]
+      Resource = "arn:aws:logs:*:*:*"
+    }]
+  })
+}
+
 # SQS 소비(persistence 람다 event source mapping)
 resource "aws_iam_policy" "sqs" {
   name        = "${var.project_name}-lambda-sqs-policy"
@@ -59,6 +74,11 @@ resource "aws_iam_policy" "sqs" {
 
 resource "aws_iam_role_policy_attachment" "logging" {
   policy_arn = aws_iam_policy.logging.arn
+  role       = aws_iam_role.lambda.name
+}
+
+resource "aws_iam_role_policy_attachment" "logs_query" {
+  policy_arn = aws_iam_policy.logs_query.arn
   role       = aws_iam_role.lambda.name
 }
 

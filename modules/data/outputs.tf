@@ -50,6 +50,11 @@ output "waiting_room_cache_cluster_id" {
   value = module.elasticache.waiting_room_cache_cluster_id
 }
 
+output "blacklist_cache_endpoint" {
+  description = "IP 블랙리스트 Redis 엔드포인트 (bot_check·bot_block 람다 공유)"
+  value       = module.elasticache.blacklist_cache_endpoint
+}
+
 # ================== secrets_manager ==================
 output "authorization_secret_arn" {
   value = module.secrets_manager.authorization_secret_arn

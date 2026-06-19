@@ -21,7 +21,7 @@ module "lambda" {
   artifact_bucket = "tfstate-bucket-d8f5bb8d"
 
   # ticketing → ElastiCache, persistence → RDS (VPC 내부). authorizer 는 CloudFront 접근 위해 VPC 제외
-  vpc_modules            = ["ticketing", "persistence"]
+  vpc_modules            = ["ticketing", "persistence", "bot_block", "bot_check"]
   vpc_subnet_ids         = var.vpc_subnet_ids
   vpc_security_group_ids = [var.lambda_sg_id]
 
@@ -43,6 +43,15 @@ module "lambda" {
     }
     captcha = {
       CAPTCHA_SECRET_ID = "${var.environment}-captcha-hmac-secret"
+    }
+    bot_block = {
+      LOG_GROUP_NAME = "/aws/apigateway/${var.project_name}-${var.environment}-access-log"
+      REDIS_HOST     = var.blacklist_cache_endpoint
+      REDIS_PORT     = "6379"
+    }
+    bot_check = {
+      REDIS_HOST = var.blacklist_cache_endpoint
+      REDIS_PORT = "6379"
     }
   }
 
