@@ -40,8 +40,13 @@ eks_app_ng_desired_size = 2
 eks_app_ng_min_size     = 2
 eks_app_ng_max_size     = 4
 
-# TODO: 클러스터 접근이 필요한 IAM Role/User 추가
-eks_access_entries = []
+# 클러스터 접근(kubectl) 운영자 — ClusterAdmin. cloud_crusade(CD)는 클러스터 생성자라 bootstrap admin 으로 자동 접근
+eks_access_entries = [
+  {
+    principal_arn = "arn:aws:iam::625368338405:user/juhyuni"
+    policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  }
+]
 
 db_username = "ccadmin"
 # db_password 는 민감값 → tfvars 평문 금지.
