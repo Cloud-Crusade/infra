@@ -178,6 +178,8 @@ resource "aws_eks_addon" "cloudwatch_observability" {
 
   # 컨테이너 로그 인입(Fluent Bit→CloudWatch Logs)은 비용 토글
   configuration_values = jsonencode({
+    # controller-manager(Deployment)는 dedicated taint 통과 toleration 필요 — 미주입 시 Pending→애드온 DEGRADED→apply 무한대기
+    manager       = { tolerations = local.addon_tolerations }
     containerLogs = { enabled = var.container_insights_container_logs_enabled }
   })
 
