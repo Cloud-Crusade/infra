@@ -184,3 +184,9 @@ variable "svc_role_passwords" {
   sensitive   = true
   default     = {}
 }
+
+variable "enable_container_insights" {
+  description = "CloudWatch Container Insights(amazon-cloudwatch-observability 애드온) 활성화 — EKS 노드/파드 메트릭을 CloudWatch 로 전송"
+  type        = bool
+  default     = false
+}

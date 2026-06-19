@@ -26,6 +26,8 @@ module "eks" {
   app_ng_max_size       = var.app_ng_max_size
 
   access_entries = var.access_entries
+
+  enable_container_insights = var.enable_container_insights
 }
 
 # ticketing 인클러스터 워크로드 — eks(클러스터) 와 분리. OIDC 는 eks 출력에서 주입(reservation IRSA)
