@@ -68,13 +68,14 @@ resource "kubernetes_config_map_v1" "db_bootstrap_sql" {
     "run.sh"   = <<-SH
       #!/bin/sh
       set -e
-      # cold build: 프록시→DB 타겟이 healthy 될 때까지 대기(타이밍 레이스로 인한 backoff 소진 방지)
+      # cold build: 프록시→DB 타겟이 healthy 될 때까지 대기(타이밍 레이스로 인한 backoff 소진 방지).
+      # Multi-AZ RDS 는 프로비저닝이 ~15-20분으로 길고 bootstrap 이 병렬 실행되므로 대기 예산을 넉넉히(최대 20분).
       wait_db() {
         i=0
         until PGPASSWORD="$MASTER_PASSWORD" psql "host=$1 port=5432 dbname=$DB_NAME user=$MASTER_USER sslmode=require connect_timeout=5" -tAc 'select 1' >/dev/null 2>&1; do
           i=$((i + 1))
-          [ "$i" -ge 60 ] && { echo "DB 연결 대기 타임아웃: $1"; exit 1; }
-          echo "DB 미준비($1) — 5s 후 재시도 ($i/60)"; sleep 5
+          [ "$i" -ge 120 ] && { echo "DB 연결 대기 타임아웃: $1"; exit 1; }
+          echo "DB 미준비($1) — 10s 후 재시도 ($i/120)"; sleep 10
         done
       }
       wait_db rds-core-writer
@@ -160,8 +161,9 @@ resource "kubernetes_job_v1" "db_bootstrap" {
   }
 
   wait_for_completion = true
+  # Multi-AZ RDS 병렬 프로비저닝(~15-20분) 대기 수용 — wait_db 예산(최대 20분)보다 넉넉히
   timeouts {
-    create = "5m"
+    create = "25m"
   }
 
   # 완료된 Job 은 자동 재실행되지 않음 — 롤 비밀번호 회전·롤 추가·스크립트 변경 시
