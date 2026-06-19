@@ -106,6 +106,9 @@ module "cluster" {
   cluster_enabled_log_types            = var.enable_cloudwatch ? var.eks_enabled_log_types : []
   access_entries                       = var.eks_access_entries
 
+  # Container Insights — enable_cloudwatch=false(부하테스트) 구간엔 자동 비활성(Grafana 대체)
+  enable_container_insights = var.enable_cloudwatch && var.enable_container_insights
+
   system_ng_instance_types = var.eks_system_ng_instance_types
   system_ng_capacity_type  = var.eks_system_ng_capacity_type
   system_ng_desired_size   = var.eks_system_ng_desired_size
@@ -275,8 +278,9 @@ module "shared" {
     module.data.waiting_room_cache_cluster_id,
   ]
   sqs_queue_names = [module.async.queue_name]
-  # EKS/APIGW 알람은 미활성 유지(활성화 = 리소스 추가 → 별도 PR)
-  eks_cluster_name = ""
+  # EKS 노드 알람 — Container Insights(amazon-cloudwatch-observability) 활성 시 ContainerInsights 메트릭으로 동작
+  # APIGW 알람은 미활성 유지(활성화 = 리소스 추가 → 별도 PR)
+  eks_cluster_name = var.enable_cloudwatch && var.enable_container_insights ? module.cluster.cluster_name : ""
   api_gateway_name = ""
 
   # ARC outcome 알람 dimension + zonal autoshift 대상 — NLB(api 레이어) 출력에서 직접 배선

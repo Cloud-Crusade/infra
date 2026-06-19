@@ -127,3 +127,22 @@ variable "access_entries" {
   }))
   default = []
 }
+
+# ================== Container Insights (amazon-cloudwatch-observability) ==================
+variable "enable_container_insights" {
+  description = "CloudWatch Container Insights 활성화 — amazon-cloudwatch-observability 애드온(CloudWatch agent + Fluent Bit)으로 노드/파드 메트릭을 ContainerInsights 네임스페이스로 전송"
+  type        = bool
+  default     = false
+}
+
+variable "cloudwatch_observability_addon_version" {
+  description = "amazon-cloudwatch-observability 애드온 버전 (null 이면 EKS 클러스터 호환 기본 버전 사용)"
+  type        = string
+  default     = null
+}
+
+variable "container_insights_container_logs_enabled" {
+  description = "Fluent Bit 컨테이너 로그를 CloudWatch Logs 로 전송할지 여부 (로그 인입 비용 토글)"
+  type        = bool
+  default     = true
+}

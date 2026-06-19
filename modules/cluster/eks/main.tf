@@ -167,6 +167,23 @@ resource "aws_eks_addon" "ebs_csi_driver" {
   depends_on = [aws_eks_node_group.this, aws_iam_role_policy_attachment.ebs_csi]
 }
 
+# Container Insights — CloudWatch agent + Fluent Bit DaemonSet.
+# v1.7+ 애드온은 모든 taint 를 기본 tolerate → system·app 노드에 자동 배치(toleration 주입 불필요).
+resource "aws_eks_addon" "cloudwatch_observability" {
+  count                    = var.enable_container_insights ? 1 : 0
+  cluster_name             = aws_eks_cluster.this.name
+  addon_name               = "amazon-cloudwatch-observability"
+  addon_version            = var.cloudwatch_observability_addon_version
+  service_account_role_arn = aws_iam_role.cloudwatch_agent[0].arn
+
+  # 컨테이너 로그 인입(Fluent Bit→CloudWatch Logs)은 비용 토글
+  configuration_values = jsonencode({
+    containerLogs = { enabled = var.container_insights_container_logs_enabled }
+  })
+
+  depends_on = [aws_eks_node_group.this, aws_iam_role_policy_attachment.cloudwatch_agent]
+}
+
 # 7. 클러스터 접근 제어
 
 resource "aws_eks_access_entry" "this" {
