@@ -77,7 +77,7 @@
       "id": 5,
       "type": "timeseries",
       "title": "RDS 실측 TPS (k6 커스텀: rds_actual_interval_tps)",
-      "description": "k6 --out experimental-prometheus-rw 의 커스텀 Trend. 첫 실행 후 실제 시리즈명 확인해 보정 가능(k6_rds_actual_interval_tps).",
+      "description": "k6 Trend 는 remote-write 시 stat suffix 가 붙음(K6_PROMETHEUS_RW_TREND_STATS). 상세는 '리키버킷' 대시보드 참고.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
@@ -85,8 +85,8 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "k6_rds_actual_interval_tps",
-          "legendFormat": "real TPS"
+          "expr": "k6_rds_actual_interval_tps_avg",
+          "legendFormat": "real TPS (avg)"
         }
       ]
     }
