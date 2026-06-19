@@ -114,3 +114,27 @@ resource "aws_iam_role_policy_attachment" "ebs_csi" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
   role       = aws_iam_role.ebs_csi.name
 }
+
+# ================== Container Insights IRSA (amazon-cloudwatch/cloudwatch-agent) ==================
+# CloudWatch agent 가 ContainerInsights 메트릭·로그를 전송할 권한(CloudWatchAgentServerPolicy).
+# 애드온이 service_account_role_arn 으로 cloudwatch-agent SA 에 이 롤을 어노테이션.
+resource "aws_iam_role" "cloudwatch_agent" {
+  count = var.enable_container_insights ? 1 : 0
+  name  = "${var.project_name}-cw-agent-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Federated = aws_iam_openid_connect_provider.eks.arn }
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Condition = { StringEquals = { (local.oidc_sub) = "system:serviceaccount:amazon-cloudwatch:cloudwatch-agent" } }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  count      = var.enable_container_insights ? 1 : 0
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+  role       = aws_iam_role.cloudwatch_agent[0].name
+}
