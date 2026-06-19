@@ -73,7 +73,16 @@ jobs:
           TF_VAR_enable_nlb_binding: "false"
           TF_VAR_enable_az_failover: ${{ inputs.enable_az_failover }}
           TF_VAR_enable_cloudwatch: ${{ inputs.enable_cloudwatch }}
-        run: terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}
+        # 전이적 타임아웃/가용성(RDS Multi-AZ 프로비저닝·helm wait) 자동 재시도 — apply 는 멱등·resumable
+        run: |
+          set +e
+          n=0; max=3
+          until terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}; do
+            n=$((n + 1))
+            [ "$n" -ge "$max" ] && { echo "::error::apply $max 회 실패"; exit 1; }
+            echo "::warning::apply 실패 — ${n}/${max}, 120s 후 재시도(전이적 타임아웃 대비)"
+            sleep 120
+          done
 
       # kubernetes_manifest(nlb_binding)는 클러스터·CRD 가 존재해야 plan 가능 → 위 apply 이후 2단계로 생성
       - name: Terraform apply (NLB binding)
@@ -84,4 +93,13 @@ jobs:
           TF_VAR_enable_nlb_binding: "true"
           TF_VAR_enable_az_failover: ${{ inputs.enable_az_failover }}
           TF_VAR_enable_cloudwatch: ${{ inputs.enable_cloudwatch }}
-        run: terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}
+        # 전이적 타임아웃 자동 재시도 — apply 는 멱등·resumable
+        run: |
+          set +e
+          n=0; max=3
+          until terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}; do
+            n=$((n + 1))
+            [ "$n" -ge "$max" ] && { echo "::error::apply(NLB binding) $max 회 실패"; exit 1; }
+            echo "::warning::apply(NLB binding) 실패 — ${n}/${max}, 120s 후 재시도"
+            sleep 120
+          done

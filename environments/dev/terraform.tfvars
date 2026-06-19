@@ -40,8 +40,13 @@ eks_app_ng_desired_size = 2
 eks_app_ng_min_size     = 2
 eks_app_ng_max_size     = 4
 
-# 클러스터 접근(kubectl) 운영자 — ClusterAdmin. cloud_crusade(CD)는 클러스터 생성자라 bootstrap admin 으로 자동 접근
+# 클러스터 접근(kubectl) — ClusterAdmin. API_AND_CONFIG_MAP 모드에선 생성자 admin 도 access entry 로
+# 부여되므로 CD(cloud_crusade) 를 반드시 포함해야 함(미포함 시 helm/k8s 전부 Unauthorized).
 eks_access_entries = [
+  {
+    principal_arn = "arn:aws:iam::625368338405:user/cloud_crusade"
+    policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  },
   {
     principal_arn = "arn:aws:iam::625368338405:user/juhyuni"
     policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
