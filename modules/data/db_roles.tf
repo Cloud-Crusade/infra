@@ -20,6 +20,8 @@ resource "random_password" "svc_role" {
 resource "aws_secretsmanager_secret" "svc_role" {
   for_each = local.svc_role_proxy
   name     = "${var.project_name}-${var.environment}-rds-role-${replace(each.key, "_", "-")}"
+  # dev 재생성 환경 — destroy 시 즉시 삭제(삭제 예약으로 이름 점유돼 재apply 충돌하는 것 방지)
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "svc_role" {

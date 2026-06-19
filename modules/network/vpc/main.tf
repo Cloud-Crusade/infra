@@ -40,6 +40,8 @@ resource "aws_subnet" "private" {
   tags = {
     Name = "${var.project_name}-${var.environment}-private-${count.index + 1}"
     Type = "private"
+    # AWS LB Controller 가 internal NLB(예: prometheus) 둘 서브넷 자동 발견
+    "kubernetes.io/role/internal-elb" = "1"
   }
 }
 
