@@ -153,6 +153,12 @@ variable "enable_cloudwatch" {
   default     = true
 }
 
+variable "enable_container_insights" {
+  description = "EKS Container Insights(amazon-cloudwatch-observability 애드온) 사용 여부. enable_cloudwatch=false 인 부하테스트 구간엔 자동 비활성(관측은 Prometheus/Grafana 대체)"
+  type        = bool
+  default     = true
+}
+
 
 # AWS Parameters and Secrets Lambda Extension (ap-northeast-2, x86_64)
 # captcha Lambda 가 Secrets Manager 를 런타임 캐시 조회할 때 사용. 버전은 최신 확인 후 갱신
