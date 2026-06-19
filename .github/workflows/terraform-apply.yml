@@ -1,0 +1,87 @@
+name: Terraform Apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 대상 환경
+        type: choice
+        options:
+          - dev
+          - prod
+      api_backend:
+        description: API GW 백엔드 (dev 전용 — prod 는 무시)
+        type: choice
+        default: eks
+        options:
+          - eks
+          - test_ec2
+      enable_az_failover:
+        description: AZ Failover (NLB zonal shift + RDS Multi-AZ + ARC). enable_cloudwatch=true 필요
+        type: boolean
+        default: false
+      enable_cloudwatch:
+        description: CloudWatch 사용 (알람·대시보드·컨트롤플레인/APIGW 로그). off 시 부하테스트 비용 절감
+        type: boolean
+        default: true
+      extra_apply_args:
+        description: apply 추가 인자 (targeted/복구용, 예 "-refresh=false -replace=...")
+        type: string
+        default: ""
+
+jobs:
+  apply:
+    name: Terraform Apply (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      # GitHub secrets/variables → TF_VAR_<소문자키> 매핑 (terraform 변수 주입)
+      - name: Map secrets/variables to TF_VAR_
+        env:
+          SECRETS_CONTEXT: ${{ toJSON(secrets) }}
+          VARS_CONTEXT: ${{ toJSON(vars) }}
+        run: |
+          to_tfvars() {
+            jq -r 'to_entries[]
+              | "TF_VAR_\(.key | ascii_downcase)<<__TFVAR_EOF__\n\(.value)\n__TFVAR_EOF__"'
+          }
+          printf '%s' "$SECRETS_CONTEXT" | to_tfvars >> "$GITHUB_ENV"
+          printf '%s' "$VARS_CONTEXT" | to_tfvars >> "$GITHUB_ENV"
+
+      - name: Terraform Init
+        working-directory: environments/${{ inputs.environment }}
+        run: terraform init -input=false
+
+      - name: Terraform apply
+        working-directory: environments/${{ inputs.environment }}
+        env:
+          TF_VAR_api_backend: ${{ inputs.api_backend }}
+          TF_VAR_enable_nlb_binding: "false"
+          TF_VAR_enable_az_failover: ${{ inputs.enable_az_failover }}
+          TF_VAR_enable_cloudwatch: ${{ inputs.enable_cloudwatch }}
+        run: terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}
+
+      # kubernetes_manifest(nlb_binding)는 클러스터·CRD 가 존재해야 plan 가능 → 위 apply 이후 2단계로 생성
+      - name: Terraform apply (NLB binding)
+        if: inputs.environment == 'dev' && inputs.api_backend == 'eks'
+        working-directory: environments/${{ inputs.environment }}
+        env:
+          TF_VAR_api_backend: ${{ inputs.api_backend }}
+          TF_VAR_enable_nlb_binding: "true"
+          TF_VAR_enable_az_failover: ${{ inputs.enable_az_failover }}
+          TF_VAR_enable_cloudwatch: ${{ inputs.enable_cloudwatch }}
+        run: terraform apply -auto-approve -input=false -lock-timeout=5m ${{ inputs.extra_apply_args }}
