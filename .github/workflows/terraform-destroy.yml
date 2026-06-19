@@ -109,9 +109,11 @@ jobs:
             sleep 30
           done
 
-      # ③ LB Controller 관리 리소스 finalizer 강제 제거 — teardown 중 컨트롤러가 finalizer 를
-      # 못 지워 삭제가 무한 대기하는 교착 방지(TargetGroupBinding + LoadBalancer Service).
-      # 어차피 NLB·타겟그룹도 삭제되므로 정상 해제는 불필요. 클러스터 부재 시 생략.
+      # ③ LB Controller 관리 리소스 정리 — teardown 중 컨트롤러가 finalizer 를 재추가해
+      # kubernetes_manifest(nlb_binding) 삭제가 무한 대기하는 교착 방지.
+      # patch-only 는 컨트롤러가 곧바로 finalizer 를 재추가하므로 무효 → "delete + finalizer 제거"로
+      # TargetGroupBinding 을 terraform destroy 전에 실제로 제거(terraform 생성 TGB 는 컨트롤러가
+      # 재생성하지 않으므로 유지됨). 어차피 NLB·타겟그룹도 삭제되므로 정상 해제는 불필요. 클러스터 부재 시 생략.
       - name: Strip LB controller finalizers
         continue-on-error: true
         run: |
@@ -119,23 +121,23 @@ jobs:
           CL="$(aws eks list-clusters --query "clusters[?ends_with(@, '-${{ inputs.environment }}-eks')] | [0]" --output text 2>/dev/null)"
           if [ -z "$CL" ] || [ "$CL" = "None" ]; then echo "EKS 클러스터 없음 — 생략"; exit 0; fi
           aws eks update-kubeconfig --name "$CL" >/dev/null 2>&1 || { echo "kubeconfig 실패 — 생략"; exit 0; }
-          # TargetGroupBinding finalizer 제거
-          kubectl get targetgroupbinding -A \
-            -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null \
-          | while read -r t; do
-              [ -z "$t" ] && continue
-              ns="${t%%/*}"; name="${t##*/}"
+          # 삭제 표시(deletionTimestamp) 후 finalizer 제거 → terminating 객체가 즉시 사라짐(컨트롤러 재추가 차단)
+          kubectl delete targetgroupbinding -A --all --wait=false 2>/dev/null
+          kubectl get targetgroupbinding -A --no-headers 2>/dev/null | awk '{print $1, $2}' \
+          | while read -r ns name; do
+              [ -z "$name" ] && continue
               kubectl patch targetgroupbinding "$name" -n "$ns" --type=merge \
-                -p '{"metadata":{"finalizers":null}}' 2>/dev/null && echo "TGB finalizer 제거: $t"
+                -p '{"metadata":{"finalizers":null}}' 2>/dev/null && echo "TGB 정리: $ns/$name"
             done
-          # LoadBalancer 타입 Service finalizer 제거(예: prometheus internal NLB)
-          kubectl get svc -A \
-            -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null \
-          | while read -r s; do
-              [ -z "$s" ] && continue
-              ns="${s%%/*}"; name="${s##*/}"
-              kubectl patch svc "$name" -n "$ns" --type=merge \
-                -p '{"metadata":{"finalizers":null}}' 2>/dev/null && echo "LB svc finalizer 제거: $s"
+          # LoadBalancer 타입 Service(예: prometheus internal NLB) 는 삭제 → 살아있는 컨트롤러가 NLB·SG 정상 정리.
+          # (finalizer patch 로 서비스만 지우면 NLB 가 고아로 남아 서브넷/VPC 삭제 차단). 타임아웃 시 finalizer 폴백(백스톱이 NLB 정리)
+          kubectl get svc -A --no-headers -o custom-columns=NS:.metadata.namespace,N:.metadata.name,T:.spec.type 2>/dev/null \
+          | awk '$3=="LoadBalancer"{print $1, $2}' \
+          | while read -r ns name; do
+              [ -z "$name" ] && continue
+              kubectl delete svc "$name" -n "$ns" --wait=true --timeout=120s 2>/dev/null \
+                && echo "LB svc 삭제(컨트롤러 NLB 정리): $ns/$name" \
+                || { kubectl patch svc "$name" -n "$ns" --type=merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null; echo "LB svc finalizer 폴백: $ns/$name"; }
             done
           echo "finalizer 정리 완료"
 
@@ -152,13 +154,22 @@ jobs:
           VPC="$(terraform state pull | jq -r '[.resources[]|select(.type=="aws_vpc")][0].instances[0].attributes.id // empty')"
           if [ -n "$VPC" ]; then
             echo "VPC=$VPC 고아 리소스 정리"
+            # 고아 LB(컨트롤러 미정리 NLB, 예: prometheus) 삭제 → in-use ENI 해제
+            for lb in $(aws elbv2 describe-load-balancers --query "LoadBalancers[?VpcId=='$VPC'].LoadBalancerArn" --output text 2>/dev/null); do
+              aws elbv2 delete-load-balancer --load-balancer-arn "$lb" 2>/dev/null && echo "LB 삭제: $lb"
+            done
+            sleep 45  # NLB ENI 해제 대기
             # CNI 보조 ENI(available) 삭제
             for eni in $(aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=$VPC" "Name=status,Values=available" --query 'NetworkInterfaces[].NetworkInterfaceId' --output text 2>/dev/null); do
               aws ec2 delete-network-interface --network-interface-id "$eni" 2>/dev/null && echo "ENI 삭제: $eni"
             done
-            # EKS 소유 고아 SG(terraform 미관리) 삭제
-            for sg in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC" "Name=tag-key,Values=aws:eks:cluster-name" --query 'SecurityGroups[].GroupId' --output text 2>/dev/null); do
-              aws ec2 delete-security-group --group-id "$sg" 2>/dev/null && echo "SG 삭제: $sg"
+            # EKS·LB Controller 소유 고아 SG(terraform 미관리) 삭제 — 상호 참조 대비 2회
+            for pass in 1 2; do
+              for tagkey in aws:eks:cluster-name elbv2.k8s.aws/cluster; do
+                for sg in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC" "Name=tag-key,Values=$tagkey" --query 'SecurityGroups[].GroupId' --output text 2>/dev/null); do
+                  aws ec2 delete-security-group --group-id "$sg" 2>/dev/null && echo "SG 삭제(pass$pass): $sg"
+                done
+              done
             done
           fi
           set -e
