@@ -55,7 +55,7 @@ jobs:
         id: lambda_sg
         working-directory: environments/${{ inputs.environment }}
         env:
-          SG_ADDR: module.security_groups.aws_security_group.lambda
+          SG_ADDR: module.shared.module.security_group.aws_security_group.lambda
         run: |
           set -euo pipefail
           if ! terraform state list | grep -qx "$SG_ADDR"; then
@@ -75,20 +75,22 @@ jobs:
         working-directory: environments/${{ inputs.environment }}
         run: terraform destroy -target=module.lambda -auto-approve -input=false -lock-timeout=5m
 
-      # ② lambda SG 의 VPC Lambda ENI(interface-type=lambda) 강제 분리·삭제.
+      # ② lambda SG 에 붙은 VPC Lambda ENI 강제 분리·삭제. interface-type 으로 거르지 않음 —
+      # 람다 VPC ENI 는 Hyperplane(interface-type=lambda)·일반(interface-type=interface) 둘 다 나타나며,
+      # SG 를 막는 건 group-id 기준 전부이므로 group-id 로만 매칭(좁은 lambda 필터는 일반 ENI 를 놓침).
       # 관리형(Hyperplane)이면 분리가 거부되므로 AWS 회수 폴링, 30분 타임아웃 시 state rm 폴백
       - name: Drain Lambda ENIs
         if: steps.lambda_sg.outputs.sg_id != ''
         env:
           SG_ID: ${{ steps.lambda_sg.outputs.sg_id }}
-          SG_ADDR: module.security_groups.aws_security_group.lambda
+          SG_ADDR: module.shared.module.security_group.aws_security_group.lambda
         working-directory: environments/${{ inputs.environment }}
         run: |
           set -euo pipefail
           deadline=$(( $(date +%s) + 1800 ))
           while :; do
             ids="$(aws ec2 describe-network-interfaces \
-              --filters "Name=group-id,Values=$SG_ID" "Name=interface-type,Values=lambda" \
+              --filters "Name=group-id,Values=$SG_ID" \
               --query 'NetworkInterfaces[].NetworkInterfaceId' --output text)"
             [ -z "$ids" ] && { echo "ENI 정리 완료"; break; }
             for eni in $ids; do
