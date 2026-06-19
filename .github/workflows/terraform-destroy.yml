@@ -109,9 +109,11 @@ jobs:
             sleep 30
           done
 
-      # ③ LB Controller 관리 리소스 finalizer 강제 제거 — teardown 중 컨트롤러가 finalizer 를
-      # 못 지워 삭제가 무한 대기하는 교착 방지(TargetGroupBinding + LoadBalancer Service).
-      # 어차피 NLB·타겟그룹도 삭제되므로 정상 해제는 불필요. 클러스터 부재 시 생략.
+      # ③ LB Controller 관리 리소스 정리 — teardown 중 컨트롤러가 finalizer 를 재추가해
+      # kubernetes_manifest(nlb_binding) 삭제가 무한 대기하는 교착 방지.
+      # patch-only 는 컨트롤러가 곧바로 finalizer 를 재추가하므로 무효 → "delete + finalizer 제거"로
+      # TargetGroupBinding 을 terraform destroy 전에 실제로 제거(terraform 생성 TGB 는 컨트롤러가
+      # 재생성하지 않으므로 유지됨). 어차피 NLB·타겟그룹도 삭제되므로 정상 해제는 불필요. 클러스터 부재 시 생략.
       - name: Strip LB controller finalizers
         continue-on-error: true
         run: |
@@ -119,23 +121,21 @@ jobs:
           CL="$(aws eks list-clusters --query "clusters[?ends_with(@, '-${{ inputs.environment }}-eks')] | [0]" --output text 2>/dev/null)"
           if [ -z "$CL" ] || [ "$CL" = "None" ]; then echo "EKS 클러스터 없음 — 생략"; exit 0; fi
           aws eks update-kubeconfig --name "$CL" >/dev/null 2>&1 || { echo "kubeconfig 실패 — 생략"; exit 0; }
-          # TargetGroupBinding finalizer 제거
-          kubectl get targetgroupbinding -A \
-            -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null \
-          | while read -r t; do
-              [ -z "$t" ] && continue
-              ns="${t%%/*}"; name="${t##*/}"
+          # 삭제 표시(deletionTimestamp) 후 finalizer 제거 → terminating 객체가 즉시 사라짐(컨트롤러 재추가 차단)
+          kubectl delete targetgroupbinding -A --all --wait=false 2>/dev/null
+          kubectl get targetgroupbinding -A --no-headers 2>/dev/null | awk '{print $1, $2}' \
+          | while read -r ns name; do
+              [ -z "$name" ] && continue
               kubectl patch targetgroupbinding "$name" -n "$ns" --type=merge \
-                -p '{"metadata":{"finalizers":null}}' 2>/dev/null && echo "TGB finalizer 제거: $t"
+                -p '{"metadata":{"finalizers":null}}' 2>/dev/null && echo "TGB 정리: $ns/$name"
             done
           # LoadBalancer 타입 Service finalizer 제거(예: prometheus internal NLB)
-          kubectl get svc -A \
-            -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' 2>/dev/null \
-          | while read -r s; do
-              [ -z "$s" ] && continue
-              ns="${s%%/*}"; name="${s##*/}"
+          kubectl get svc -A --no-headers -o custom-columns=NS:.metadata.namespace,N:.metadata.name,T:.spec.type 2>/dev/null \
+          | awk '$3=="LoadBalancer"{print $1, $2}' \
+          | while read -r ns name; do
+              [ -z "$name" ] && continue
               kubectl patch svc "$name" -n "$ns" --type=merge \
-                -p '{"metadata":{"finalizers":null}}' 2>/dev/null && echo "LB svc finalizer 제거: $s"
+                -p '{"metadata":{"finalizers":null}}' 2>/dev/null && echo "LB svc 정리: $ns/$name"
             done
           echo "finalizer 정리 완료"
 
