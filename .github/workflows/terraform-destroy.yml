@@ -124,18 +124,27 @@ jobs:
             || echo "::warning::nlb_binding targeted destroy 타임아웃/실패 — 다음 finalizer strip 으로 폴백"
 
       # ④ LB Controller 관리 리소스 정리(폴백) — teardown 중 컨트롤러가 finalizer 를 재추가해
-      # kubernetes_manifest(nlb_binding) 삭제가 무한 대기하는 교착 방지.
-      # patch-only 는 컨트롤러가 곧바로 finalizer 를 재추가하므로 무효 → "delete + finalizer 제거"로
-      # TargetGroupBinding 을 terraform destroy 전에 실제로 제거(terraform 생성 TGB 는 컨트롤러가
-      # 재생성하지 않으므로 유지됨). 어차피 NLB·타겟그룹도 삭제되므로 정상 해제는 불필요. 클러스터 부재 시 생략.
-      - name: Strip LB controller finalizers
+      # kubernetes_manifest(nlb_binding) 삭제가 무한 대기하는 교착 방지. 아래 ④-1·④-2 로 분리.
+
+      # 클러스터 식별 + kubeconfig 설정. 이후 ④-1·④-2 가 ready 출력으로 게이팅. 클러스터 부재 시 생략.
+      - name: Configure kubectl
+        id: kubectl
         continue-on-error: true
         run: |
           set +e
           CL="$(aws eks list-clusters --query "clusters[?ends_with(@, '-${{ inputs.environment }}-eks')] | [0]" --output text 2>/dev/null)"
-          if [ -z "$CL" ] || [ "$CL" = "None" ]; then echo "EKS 클러스터 없음 — 생략"; exit 0; fi
-          aws eks update-kubeconfig --name "$CL" >/dev/null 2>&1 || { echo "kubeconfig 실패 — 생략"; exit 0; }
-          # 삭제 표시(deletionTimestamp) 후 finalizer 제거 → terminating 객체가 즉시 사라짐(컨트롤러 재추가 차단)
+          if [ -z "$CL" ] || [ "$CL" = "None" ]; then echo "EKS 클러스터 없음 — 생략"; echo "ready=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          aws eks update-kubeconfig --name "$CL" >/dev/null 2>&1 || { echo "kubeconfig 실패 — 생략"; echo "ready=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      # ④-1 TargetGroupBinding finalizer 제거. patch-only 는 컨트롤러가 곧바로 재추가하므로 무효 →
+      # "delete(deletionTimestamp 표시) + finalizer 제거"로 terraform destroy 전에 실제로 제거
+      # (terraform 생성 TGB 는 컨트롤러가 재생성하지 않으므로 유지됨).
+      - name: Strip TargetGroupBinding finalizers
+        if: steps.kubectl.outputs.ready == 'true'
+        continue-on-error: true
+        run: |
+          set +e
           kubectl delete targetgroupbinding -A --all --wait=false 2>/dev/null
           kubectl get targetgroupbinding -A --no-headers 2>/dev/null | awk '{print $1, $2}' \
           | while read -r ns name; do
@@ -143,8 +152,14 @@ jobs:
               kubectl patch targetgroupbinding "$name" -n "$ns" --type=merge \
                 -p '{"metadata":{"finalizers":null}}' 2>/dev/null && echo "TGB 정리: $ns/$name"
             done
-          # LoadBalancer 타입 Service(예: prometheus internal NLB) 는 삭제 → 살아있는 컨트롤러가 NLB·SG 정상 정리.
-          # (finalizer patch 로 서비스만 지우면 NLB 가 고아로 남아 서브넷/VPC 삭제 차단). 타임아웃 시 finalizer 폴백(백스톱이 NLB 정리)
+
+      # ④-2 LoadBalancer 타입 Service(예: prometheus internal NLB) 삭제 → 살아있는 컨트롤러가 NLB·SG 정상 정리.
+      # (finalizer patch 로 서비스만 지우면 NLB 가 고아로 남아 서브넷/VPC 삭제 차단). 타임아웃 시 finalizer 폴백(백스톱이 NLB 정리)
+      - name: Delete LoadBalancer services
+        if: steps.kubectl.outputs.ready == 'true'
+        continue-on-error: true
+        run: |
+          set +e
           kubectl get svc -A --no-headers -o custom-columns=NS:.metadata.namespace,N:.metadata.name,T:.spec.type 2>/dev/null \
           | awk '$3=="LoadBalancer"{print $1, $2}' \
           | while read -r ns name; do
@@ -153,38 +168,45 @@ jobs:
                 && echo "LB svc 삭제(컨트롤러 NLB 정리): $ns/$name" \
                 || { kubectl patch svc "$name" -n "$ns" --type=merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null; echo "LB svc finalizer 폴백: $ns/$name"; }
             done
-          echo "finalizer 정리 완료"
 
-      # ⑤ 전체 destroy — 실패 시 EKS 고아 리소스(클러스터 삭제 후 잔존) 정리 후 1회 재시도.
-      # EKS 가 자동 생성하는 CNI 보조 ENI(aws-K8S-*, available) 와 클러스터 SG(eks-cluster-sg-*,
-      # aws:eks:cluster-name 태그)는 terraform 미관리라 클러스터 삭제 후 고아로 남아 서브넷/VPC
-      # 삭제를 DependencyViolation 으로 막음 → 정리 후 재시도하면 통과.
+      # ⑤ 전체 destroy(1차). 실패해도 다음 고아 정리·재시도 step 으로 이어지도록 continue-on-error.
       - name: Terraform destroy
+        id: destroy
+        continue-on-error: true
+        working-directory: environments/${{ inputs.environment }}
+        run: terraform destroy -auto-approve -input=false -lock-timeout=5m
+
+      # ⑥ 1차 실패 시에만 — EKS 가 자동 생성하는 CNI 보조 ENI(aws-K8S-*, available) 와 클러스터 SG
+      # (eks-cluster-sg-*, aws:eks:cluster-name 태그), 컨트롤러 미정리 NLB 는 terraform 미관리라
+      # 클러스터 삭제 후 고아로 남아 서브넷/VPC 삭제를 DependencyViolation 으로 막음 → 정리 후 재시도하면 통과.
+      - name: Cleanup orphaned EKS/LB resources
+        if: steps.destroy.outcome == 'failure'
         working-directory: environments/${{ inputs.environment }}
         run: |
-          set +e
-          terraform destroy -auto-approve -input=false -lock-timeout=5m && exit 0
-          echo "::warning::1차 destroy 실패 — EKS 고아 ENI/SG 정리 후 재시도"
+          set -e
           VPC="$(terraform state pull | jq -r '[.resources[]|select(.type=="aws_vpc")][0].instances[0].attributes.id // empty')"
-          if [ -n "$VPC" ]; then
-            echo "VPC=$VPC 고아 리소스 정리"
-            # 고아 LB(컨트롤러 미정리 NLB, 예: prometheus) 삭제 → in-use ENI 해제
-            for lb in $(aws elbv2 describe-load-balancers --query "LoadBalancers[?VpcId=='$VPC'].LoadBalancerArn" --output text 2>/dev/null); do
-              aws elbv2 delete-load-balancer --load-balancer-arn "$lb" 2>/dev/null && echo "LB 삭제: $lb"
-            done
-            sleep 45  # NLB ENI 해제 대기
-            # CNI 보조 ENI(available) 삭제
-            for eni in $(aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=$VPC" "Name=status,Values=available" --query 'NetworkInterfaces[].NetworkInterfaceId' --output text 2>/dev/null); do
-              aws ec2 delete-network-interface --network-interface-id "$eni" 2>/dev/null && echo "ENI 삭제: $eni"
-            done
-            # EKS·LB Controller 소유 고아 SG(terraform 미관리) 삭제 — 상호 참조 대비 2회
-            for pass in 1 2; do
-              for tagkey in aws:eks:cluster-name elbv2.k8s.aws/cluster; do
-                for sg in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC" "Name=tag-key,Values=$tagkey" --query 'SecurityGroups[].GroupId' --output text 2>/dev/null); do
-                  aws ec2 delete-security-group --group-id "$sg" 2>/dev/null && echo "SG 삭제(pass$pass): $sg"
-                done
+          [ -z "$VPC" ] && { echo "VPC 미확인 — 정리 생략"; exit 0; }
+          echo "VPC=$VPC 고아 리소스 정리"
+          # 고아 LB(컨트롤러 미정리 NLB, 예: prometheus) 삭제 → in-use ENI 해제
+          for lb in $(aws elbv2 describe-load-balancers --query "LoadBalancers[?VpcId=='$VPC'].LoadBalancerArn" --output text 2>/dev/null); do
+            aws elbv2 delete-load-balancer --load-balancer-arn "$lb" 2>/dev/null && echo "LB 삭제: $lb"
+          done
+          sleep 45  # NLB ENI 해제 대기
+          # CNI 보조 ENI(available) 삭제
+          for eni in $(aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=$VPC" "Name=status,Values=available" --query 'NetworkInterfaces[].NetworkInterfaceId' --output text 2>/dev/null); do
+            aws ec2 delete-network-interface --network-interface-id "$eni" 2>/dev/null && echo "ENI 삭제: $eni"
+          done
+          # EKS·LB Controller 소유 고아 SG(terraform 미관리) 삭제 — 상호 참조 대비 2회
+          for pass in 1 2; do
+            for tagkey in aws:eks:cluster-name elbv2.k8s.aws/cluster; do
+              for sg in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$VPC" "Name=tag-key,Values=$tagkey" --query 'SecurityGroups[].GroupId' --output text 2>/dev/null); do
+                aws ec2 delete-security-group --group-id "$sg" 2>/dev/null && echo "SG 삭제(pass$pass): $sg"
               done
             done
-          fi
-          set -e
-          terraform destroy -auto-approve -input=false -lock-timeout=5m
+          done
+
+      # ⑦ 고아 정리 후 재시도. 1차 성공 시 skip.
+      - name: Terraform destroy (retry)
+        if: steps.destroy.outcome == 'failure'
+        working-directory: environments/${{ inputs.environment }}
+        run: terraform destroy -auto-approve -input=false -lock-timeout=5m
