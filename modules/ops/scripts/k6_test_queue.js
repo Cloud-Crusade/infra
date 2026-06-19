@@ -1,5 +1,5 @@
 import { check, sleep } from 'k6';
-import { Trend, Gauge } from 'k6/metrics';
+import { Trend, Gauge, Counter } from 'k6/metrics';
 // [PostgreSQL 플러그인] DB 시스템 뷰 직접 질의를 위한 내장 모듈
 import sql from 'k6/x/sql';
 import driver from 'k6/x/sql/driver/postgres';
@@ -10,6 +10,11 @@ import { AWSConfig, SQSClient } from 'https://jslib.k6.io/aws/0.14.0/sqs.js';
 const rdsIntervalRealTPS = new Trend('rds_actual_interval_tps');
 // [전체 평균] interval 분포와 섞이지 않도록 별도 Gauge 로 분리(분포 왜곡 방지)
 const rdsOverallAvgTPS = new Gauge('rds_overall_avg_tps');
+
+// [리키버킷 도착률] SQS 인입(arrival) — 드레인(rds 실측 TPS)과 대비해 버킷 누적/배출을 관측
+const sqsMessagesSent = new Counter('sqs_messages_sent'); // 인입 성공 메시지 수 → rate() 가 도착률(msg/s)
+const sqsBatchFailed = new Counter('sqs_batch_failed');   // 배치 전송 실패 메시지 수
+const sqsSendDuration = new Trend('sqs_send_duration', true); // 배치 전송 소요(ms)
 
 // [환경설정] 모든 인프라 및 자격 증명 정보를 환경변수(__ENV)로 안전하게 주입받음
 const CONFIG = {
@@ -114,10 +119,16 @@ export default async function (setupData) {
 
     // 실제 SQS 배치 전송 — 라이브러리가 SigV4 서명·JSON 프로토콜 처리
     let batchOk = false;
+    const sendStart = Date.now();
     try {
         const result = await sqs.sendMessageBatch(CONFIG.SQS_QUEUE_URL, entries);
+        sqsSendDuration.add(Date.now() - sendStart);
+        const okCount = entries.length - result.failed.length;
+        sqsMessagesSent.add(okCount);                                  // 도착률 = rate(k6_sqs_messages_sent_total)
+        if (result.failed.length > 0) sqsBatchFailed.add(result.failed.length);
         batchOk = result.failed.length === 0;
     } catch (err) {
+        sqsBatchFailed.add(entries.length);
         // 테스트는 중단하지 않되 원인 파악을 위해 에러는 로깅 (CWE-391: 에러 은닉 방지)
         console.error('[SQS 전송 에러]', err.message);
     }

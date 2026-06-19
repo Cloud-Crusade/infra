@@ -1,0 +1,158 @@
+{
+  "uid": "leaky_bucket",
+  "title": "리키버킷 — SQS FIFO→RDS (k6 queue)",
+  "description": "k6_test_queue.js — SQS FIFO 인입(arrival) 대비 RDS 일정 속도 처리(leaky bucket drain) 관측. 실행: docker compose run --rm k6-sql run --out experimental-prometheus-rw /scripts/k6_test_queue.js",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "10s",
+  "time": { "from": "now-15m", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "도착 vs 드레인 (msg/s) — 리키버킷 핵심",
+      "description": "arrival=rate(k6_sqs_messages_sent_total) (SQS 인입), drain=k6_rds_actual_interval_tps_avg (RDS 실측 처리). 도착이 드레인보다 크면 큐 백로그 누적 = 일정 속도 배출(leaky bucket).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(k6_sqs_messages_sent_total[1m]))",
+          "legendFormat": "arrival (인입 msg/s)"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_rds_actual_interval_tps_avg",
+          "legendFormat": "drain (RDS 실측 TPS)"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "RDS 실측 처리 TPS 분포",
+      "description": "k6_rds_actual_interval_tps — 5초 주기 실측(pg_stat_database.tup_inserted) 분포. 일정해야 leaky bucket.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_rds_actual_interval_tps_avg",
+          "legendFormat": "avg"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_rds_actual_interval_tps_p95",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_rds_actual_interval_tps_max",
+          "legendFormat": "max"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "전체 평균 실측 TPS (teardown)",
+      "description": "k6_rds_overall_avg_tps — 테스트 종료 시 산정된 전체 평균(Gauge). 실행 종료 후 표시.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_rds_overall_avg_tps",
+          "legendFormat": "overall avg TPS"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "SQS 배치 전송 지연 (ms)",
+      "description": "k6_sqs_send_duration — sendMessageBatch 소요(avg/p95/p99).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_sqs_send_duration_avg",
+          "legendFormat": "avg"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_sqs_send_duration_p95",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_sqs_send_duration_p99",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "배치 실패율 · 인입 누적",
+      "description": "fail=rate(k6_sqs_batch_failed_total), sent=k6_sqs_messages_sent_total(누적). 실패가 0 이어야 정상.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(k6_sqs_batch_failed_total[1m]))",
+          "legendFormat": "failed/s"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_sqs_messages_sent_total",
+          "legendFormat": "sent total"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "VUs · SQS 전송 성공 체크율",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 25 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_vus",
+          "legendFormat": "vus"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_checks_rate",
+          "legendFormat": "checks ok rate"
+        }
+      ]
+    }
+  ]
+}

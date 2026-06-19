@@ -17,6 +17,8 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
       # Prometheus remote-write 출력(--out experimental-prometheus-rw). 예: http://<prometheus>/api/v1/write
       K6_PROMETHEUS_RW_SERVER_URL: ${K6_PROMETHEUS_RW_SERVER_URL:-http://host.docker.internal:9090/api/v1/write}
+      # Trend 메트릭 시리즈명 결정화 — k6_<name>_avg/_min/_max/_med/_p90/_p95/_p99 (Grafana 쿼리 고정)
+      K6_PROMETHEUS_RW_TREND_STATS: ${K6_PROMETHEUS_RW_TREND_STATS:-avg,min,max,med,p(90),p(95),p(99)}
 
   # xk6-sql(PostgreSQL) 포함 커스텀 k6 — DB 직접 질의 테스트용. Dockerfile 로 빌드.
   k6-sql:
@@ -33,3 +35,4 @@ services:
       EVENT_ID: ${EVENT_ID:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
       K6_PROMETHEUS_RW_SERVER_URL: ${K6_PROMETHEUS_RW_SERVER_URL:-http://host.docker.internal:9090/api/v1/write}
+      K6_PROMETHEUS_RW_TREND_STATS: ${K6_PROMETHEUS_RW_TREND_STATS:-avg,min,max,med,p(90),p(95),p(99)}

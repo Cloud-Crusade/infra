@@ -1,0 +1,203 @@
+{
+  "uid": "token_bucket",
+  "title": "토큰버킷 — 대기열 입장 (k6 ticketing)",
+  "description": "k6_test_ticketing.js — 대기열 입장 토큰 배출(token bucket) 관측. 실행: docker compose run --rm k6 run --out experimental-prometheus-rw /scripts/k6_test_ticketing.js",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "10s",
+  "time": { "from": "now-15m", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "입장 배출률 (admissions/s) — 토큰 발급 속도",
+      "description": "rate(k6_completed_users_total) — 토큰버킷이 초당 입장시킨 유저 수. 설정된 refill rate 와 대조.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(k6_completed_users_total[1m]))",
+          "legendFormat": "admissions/s"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "대기열 remaining 추이 — 버킷 배출 곡선",
+      "description": "k6_waiting_remaining — 폴링 시 응답의 남은 대기 인원. 단조 감소(배출)해야 정상.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_waiting_remaining_avg",
+          "legendFormat": "remaining avg"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_waiting_remaining_max",
+          "legendFormat": "remaining max"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "입장 완료 시간 (ms) — 대기 체감",
+      "description": "k6_time_to_completed — 첫 폴링→COMPLETED 소요. p95/p99/avg.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_time_to_completed_avg",
+          "legendFormat": "avg"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_time_to_completed_p95",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_time_to_completed_p99",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "입장까지 폴링 횟수",
+      "description": "k6_polls_to_completed — 입장까지 필요한 폴링 수(avg/p95).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_polls_to_completed_avg",
+          "legendFormat": "avg"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_polls_to_completed_p95",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "배정 순번 분포",
+      "description": "k6_assigned_queue_number — VU(유저)별 최초 배정 순번(avg/max).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_assigned_queue_number_avg",
+          "legendFormat": "avg"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_assigned_queue_number_max",
+          "legendFormat": "max"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "완료 비율 · 불변식 (0~1)",
+      "description": "k6_completed_rate(입장 완료 비율), queue_number_stable(순번 고정), remaining_monotonic(단조 감소). 1.0 에 가까워야 정상.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_completed_rate",
+          "legendFormat": "completed"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_queue_number_stable_rate",
+          "legendFormat": "number stable"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_remaining_monotonic_rate",
+          "legendFormat": "remaining monotonic"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "VUs · 폴링 요청률 (req/s)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_vus",
+          "legendFormat": "vus"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(k6_http_reqs_total[1m]))",
+          "legendFormat": "polls/s"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "폴링 지연 (ms)",
+      "description": "k6_http_req_duration — /queue 폴링 응답시간(avg/p95).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_http_req_duration_avg",
+          "legendFormat": "avg"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "k6_http_req_duration_p95",
+          "legendFormat": "p95"
+        }
+      ]
+    }
+  ]
+}
