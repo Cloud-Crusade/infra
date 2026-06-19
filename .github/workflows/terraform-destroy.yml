@@ -109,7 +109,19 @@ jobs:
             sleep 30
           done
 
-      # ③ LB Controller 관리 리소스 정리 — teardown 중 컨트롤러가 finalizer 를 재추가해
+      # ③ nlb_binding 우선 단독 삭제(정석) — 클러스터·컨트롤러·NLB·타겟그룹이 모두 healthy 한 상태에서
+      # 컨트롤러가 정상 디레지스터 + finalizer 제거. 본격 destroy 의 병렬 teardown(노드 드레인 등)으로
+      # 컨트롤러가 불안정해지기 전에 처리하는 게 핵심. 타임아웃(SIGINT 로 락 안전 해제) 시 다음 strip 이 폴백.
+      - name: Targeted destroy of nlb_binding
+        continue-on-error: true
+        working-directory: environments/${{ inputs.environment }}
+        run: |
+          timeout -s INT 300 terraform destroy -target='module.shared.kubernetes_manifest.nlb_binding' \
+            -auto-approve -input=false -lock-timeout=5m \
+            && echo "nlb_binding 단독 삭제 완료" \
+            || echo "::warning::nlb_binding targeted destroy 타임아웃/실패 — 다음 finalizer strip 으로 폴백"
+
+      # ④ LB Controller 관리 리소스 정리(폴백) — teardown 중 컨트롤러가 finalizer 를 재추가해
       # kubernetes_manifest(nlb_binding) 삭제가 무한 대기하는 교착 방지.
       # patch-only 는 컨트롤러가 곧바로 finalizer 를 재추가하므로 무효 → "delete + finalizer 제거"로
       # TargetGroupBinding 을 terraform destroy 전에 실제로 제거(terraform 생성 TGB 는 컨트롤러가
@@ -141,7 +153,7 @@ jobs:
             done
           echo "finalizer 정리 완료"
 
-      # ④ 전체 destroy — 실패 시 EKS 고아 리소스(클러스터 삭제 후 잔존) 정리 후 1회 재시도.
+      # ⑤ 전체 destroy — 실패 시 EKS 고아 리소스(클러스터 삭제 후 잔존) 정리 후 1회 재시도.
       # EKS 가 자동 생성하는 CNI 보조 ENI(aws-K8S-*, available) 와 클러스터 SG(eks-cluster-sg-*,
       # aws:eks:cluster-name 태그)는 terraform 미관리라 클러스터 삭제 후 고아로 남아 서브넷/VPC
       # 삭제를 DependencyViolation 으로 막음 → 정리 후 재시도하면 통과.
