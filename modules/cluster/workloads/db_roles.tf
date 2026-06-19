@@ -68,6 +68,18 @@ resource "kubernetes_config_map_v1" "db_bootstrap_sql" {
     "run.sh"   = <<-SH
       #!/bin/sh
       set -e
+      # cold build: 프록시→DB 타겟이 healthy 될 때까지 대기(타이밍 레이스로 인한 backoff 소진 방지)
+      wait_db() {
+        i=0
+        until PGPASSWORD="$MASTER_PASSWORD" psql "host=$1 port=5432 dbname=$DB_NAME user=$MASTER_USER sslmode=require connect_timeout=5" -tAc 'select 1' >/dev/null 2>&1; do
+          i=$((i + 1))
+          [ "$i" -ge 60 ] && { echo "DB 연결 대기 타임아웃: $1"; exit 1; }
+          echo "DB 미준비($1) — 5s 후 재시도 ($i/60)"; sleep 5
+        done
+      }
+      wait_db rds-core-writer
+      wait_db rds-reservation-writer
+
       bootstrap() {
         PGPASSWORD="$MASTER_PASSWORD" psql "host=$1 port=5432 dbname=$DB_NAME user=$MASTER_USER sslmode=require" \
           -v ON_ERROR_STOP=1 -v role="$2" -v pw="$3" -v db="$DB_NAME" -f /sql/role.sql
@@ -86,6 +98,7 @@ resource "kubernetes_job_v1" "db_bootstrap" {
     name      = "ticketing-db-bootstrap"
     namespace = local.ticketing_namespace
   }
+
   spec {
     backoff_limit = 3
     template {
@@ -151,12 +164,13 @@ resource "kubernetes_job_v1" "db_bootstrap" {
     create = "5m"
   }
 
-  # 완료된 Job 은 자동 재실행되지 않음 — 롤 비밀번호(random_password) 회전·롤 추가 시
-  # SQL/시크릿이 바뀌면 Job 을 재생성해 재실행(role.sql 은 멱등이라 안전)
+  # 완료된 Job 은 자동 재실행되지 않음 — 롤 비밀번호 회전·롤 추가·스크립트 변경 시
+  # data(SQL/run.sh·시크릿)가 바뀌면 Job 재생성해 재실행(role.sql 은 멱등). in-place 변경 감지를
+  # 위해 .data 속성을 참조(전체 리소스 참조는 replace 시에만 발화).
   lifecycle {
     replace_triggered_by = [
-      kubernetes_config_map_v1.db_bootstrap_sql,
-      kubernetes_secret_v1.db_bootstrap,
+      kubernetes_config_map_v1.db_bootstrap_sql.data,
+      kubernetes_secret_v1.db_bootstrap.data,
     ]
   }
 
