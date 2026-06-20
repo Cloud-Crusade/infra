@@ -19,6 +19,7 @@ module "lambda" {
   project_name    = var.project_name
   environment     = var.environment
   artifact_bucket = "tfstate-bucket-d8f5bb8d"
+  timeout         = 60
 
   # ticketing → ElastiCache, persistence → RDS (VPC 내부). authorizer 는 CloudFront 접근 위해 VPC 제외
   vpc_modules            = ["ticketing", "persistence", "bot_block", "bot_check"]
