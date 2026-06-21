@@ -8,6 +8,7 @@
 - [Directory Structure](#directory-structure)
 - [Getting Started](#getting-started)
 - [Convention](#convention)
+- [설계 문서](#설계-문서)
 
 ## Overview
 
@@ -192,10 +193,10 @@ terraform apply      # 실제 적용
 
 | 항목 | dev | prod |
 | --- | --- | --- |
-| S3 버킷 | `tfstate-bucket-d8f5bb8d` | `tfstate-bucket-d8f5bb8d` |
+| S3 버킷 | `tfstate-bucket-********` | `tfstate-bucket-********` |
 | state 키 | `dev/terraform.tfstate` | `prod/terraform.tfstate` |
 | 리전 | `ap-northeast-2` | `ap-northeast-2` |
-| 잠금 테이블(DynamoDB) | `terraform-lock` | `terraform-lock` |
+| 잠금 테이블(DynamoDB) | `terraform-****` | `terraform-****` |
 | 암호화 | `encrypt = true` | `encrypt = true` |
 
 ### 민감 파일 관리 (.gitignore)
@@ -274,3 +275,9 @@ resource "local_file" "ssh_key" {
 - **미연결 모듈 참조** — 빈 문자열(`""`) placeholder + 실제 참조는 주석으로 표기
 - **민감 변수** — `sensitive = true` + `default = ""`로 CI plan 호환성 유지
 - **모듈 연동** — 직접 참조 대신 `terraform.tfvars`로 값 주입
+
+## 설계 문서
+
+모듈별 설계 배경(검토한 대안, 트레이드오프, 회고)을 더 자세히 정리한 문서입니다.
+
+📄 [TicketWave 인프라 설계 문서 (Notion)](https://auspicious-blackbird-ed1.notion.site/TicketWave-Infra-Design-Document-386d8198f25781c08879e58c4958eb19?source=copy_link)
