@@ -169,6 +169,38 @@ jobs:
                 || { kubectl patch svc "$name" -n "$ns" --type=merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null; echo "LB svc finalizer 폴백: $ns/$name"; }
             done
 
+      # ④-3 API Gateway REST VPC Link 선삭제 — VPC Link 는 NLB 에 PrivateLink endpoint service
+      # (API GW 계정 소유, 자동 생성)를 붙여, 살아있으면 terraform 의 NLB 삭제가 ResourceInUse 로 막힘.
+      # terraform 의존성상 VPC Link 가 NLB 보다 먼저 삭제되지만 endpoint service teardown 이 비동기(~수십초)라
+      # 그 직후 NLB 삭제가 레이스로 실패 → 여기서 미리 삭제하고 endpoint service 소멸까지 폴링해 레이스 제거.
+      - name: Pre-delete API Gateway VPC Links
+        continue-on-error: true
+        run: |
+          set +e
+          vls="$(aws apigateway get-vpc-links --query 'items[].id' --output text 2>/dev/null)"
+          [ -z "$vls" ] && { echo "VPC Link 없음 — 생략"; exit 0; }
+          for vl in $vls; do
+            aws apigateway delete-vpc-link --vpc-link-id "$vl" 2>/dev/null && echo "VPC Link 삭제: $vl"
+          done
+          # endpoint service(NLB 참조) 가 모두 사라질 때까지 대기(최대 5분). 잔존 시 강제 삭제(연결 reject 후).
+          deadline=$(( $(date +%s) + 300 ))
+          while :; do
+            svcs="$(aws ec2 describe-vpc-endpoint-service-configurations \
+              --query 'ServiceConfigurations[?NetworkLoadBalancerArns!=`null`].ServiceId' --output text 2>/dev/null)"
+            [ -z "$svcs" ] && { echo "endpoint service 정리 완료"; break; }
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::warning::endpoint service 잔존 — 강제 삭제 시도"
+              for svc in $svcs; do
+                eps="$(aws ec2 describe-vpc-endpoint-connections --filters "Name=service-id,Values=$svc" \
+                  --query 'VpcEndpointConnections[?VpcEndpointState!=`deleted` && VpcEndpointState!=`rejected`].VpcEndpointId' --output text 2>/dev/null)"
+                [ -n "$eps" ] && aws ec2 reject-vpc-endpoint-connections --service-id "$svc" --vpc-endpoint-ids $eps 2>/dev/null
+                aws ec2 delete-vpc-endpoint-service-configurations --service-ids "$svc" 2>/dev/null && echo "endpoint service 강제 삭제: $svc"
+              done
+              break
+            fi
+            sleep 15
+          done
+
       # ⑤ 전체 destroy(1차). 실패해도 다음 고아 정리·재시도 step 으로 이어지도록 continue-on-error.
       - name: Terraform destroy
         id: destroy
