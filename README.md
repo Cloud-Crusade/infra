@@ -48,6 +48,8 @@
 | 역할 | 전체 인프라가 올라갈 VPC 네트워크 토대 제공 |
 | 하위 모듈 | `vpc/` |
 | 주요 리소스 | VPC, public/private 서브넷, IGW(Internet Gateway), NAT Gateway, 라우팅 테이블 |
+| 가용성 설계 | 서브넷을 Multi-AZ로 분산 배치해 EKS 노드·RDS 이중화의 토대 제공 |
+| 보안 설계 | public/private 서브넷 분리, 외부 통신은 NAT 경유만 허용해 내부 리소스 노출 최소화 |
 | 비고 | 서브넷·VPC ID를 출력해 cluster·data·api 등 다른 레이어가 참조 |
 
 ### `cluster` — 쿠버네티스(EKS) 클러스터·애드온
@@ -57,7 +59,8 @@
 | 역할 | 백엔드(WAS) 워크로드가 동작하는 EKS(Elastic Kubernetes Service) 클러스터와 운영 애드온 구성 |
 | 하위 모듈 | `eks/`, `aws_lb_controller/`, `cluster_autoscaler/`, `metrics_server/`, `prometheus/`, `workloads/` |
 | 주요 리소스 | EKS 클러스터·노드그룹, IRSA(IAM Roles for Service Accounts) 역할, AWS LB Controller, Cluster Autoscaler, metrics-server(HPA용), Prometheus |
-| 비고 | 트래픽 증가 시 노드/파드 자동 확장 담당 |
+| 확장 전략 | Cloud Bursting — 평시 Scale-In으로 최소 노드만 유지(비용 절감), 예매 오픈 시 Auto Scaling으로 즉시 확장(버스트 대응). 비용과 가용성의 절충 |
+| 특이사항 | 노드를 Multi-AZ로 분산해 한 AZ 장애에도 클러스터 유지. 모니터링은 비용 고정형 Prometheus 주력(`ops`·`shared` 참고) |
 
 ### `data` — 데이터 저장·캐시·비밀 (AZ 페일오버 · 데이터 계층 포함)
 
@@ -66,9 +69,11 @@
 | 역할 | 영속 데이터·대기열 캐시·민감 정보 관리 + AZ 장애 시 DB 자동 승격 |
 | 하위 모듈 | `rds/`, `rds_proxy/`, `elasticache/`, `secrets_manager/` (+ `db_roles.tf`) |
 | 주요 리소스 | RDS Multi-AZ(스탠바이 복제본 + 자동 장애조치), RDS Proxy, ElastiCache Redis(대기열), Secrets Manager(JWT 키·DB 자격증명·writer 엔드포인트) |
-| RDS Proxy | 연결을 대신 유지해 장애 시 재연결 약 1초 / 앱은 Proxy 경유만 허용(접속 일원화) / 배포 단계의 on/off 플래그로 비용 제어 |
+| 캐시 선택 | 대기열을 SQS(약 226ms) 대신 Redis(9.66ms)로 채택 — 속도·실시간 순번·Atomic 중복 발급 방지 우위 (SQS의 무유실 장점보다 폭증 흡수·속도·순서를 우선) |
+| DB 구성 | Reader/Writer 엔드포인트 분리로 읽기 부하 분산 + RDS Multi-AZ로 Primary 장애 시 다른 AZ 자동 승격(Failover) |
+| RDS Proxy | 커넥션 풀링으로 DB 부하 분산, 장애 시 연결 유지로 재연결 약 1초, 앱은 Proxy 경유만 허용(접속 일원화·보안), 배포 단계 on/off 플래그로 비용 제어 |
 | 흐름 | App → RDS Proxy → DB (Multi-AZ) |
-| 비고 | Lambda/WAS가 Secrets Manager에서 키·자격증명을 주입받음 |
+| 특이사항 | 과접속 IP 블랙리스트를 ElastiCache로 관리(봇 차단), Lambda/WAS가 Secrets Manager에서 키·자격증명 주입 |
 
 ### `async` — 비동기 처리 파이프라인
 
@@ -77,7 +82,8 @@
 | 역할 | 예매·결제 쓰기를 큐로 분리해 DB 유입 속도 제어 |
 | 하위 모듈 | `sqs/`, `lambda/`, `eventbridge/` |
 | 주요 리소스 | SQS(Simple Queue Service) FIFO 큐, Lambda 함수·레이어·이벤트 소스 매핑, EventBridge 트리거 |
-| 비고 | `persistence` Lambda를 leaky bucket(batchSize/reserved concurrency)으로 운영 |
+| 트래픽 제어 | Leaky Bucket — WAS 확장에 비례해 DB 트래픽이 폭증·다운되는 문제를, 쓰기를 비동기 처리하고 약 100~200 TPS로 평탄화해 방지 |
+| 특이사항 | `persistence` Lambda를 leaky bucket(batchSize/reserved concurrency)으로 운영, ElastiCache 캐싱으로 정합성·DB 가용성 확보 |
 
 ### `api` — 외부 API 진입점
 
@@ -86,6 +92,8 @@
 | 역할 | 외부 요청을 받아 인증·라우팅 후 백엔드로 전달 |
 | 하위 모듈 | `apigateway/`, `nlb/`, `route53/` |
 | 주요 리소스 | API Gateway(REQUEST authorizer Lambda 연동), NLB(Network Load Balancer), Route53 DNS 레코드 |
+| 진입점 선택 | ALB Ingress(Lambda 불가)·API Gateway+ALB(비용·L7 지연) → **API Gateway + NLB(L4)** L4 빠른 라우팅·연산 최소화·고가용성, gRPC는 DNS Resolver로 해결 |
+| 특이사항 | WAF 규칙으로 봇·매크로 트래픽을 진입 단계에서 1차 필터링 |
 
 ### `frontend` — 정적 웹 배포·CDN
 
@@ -93,7 +101,9 @@
 | --- | --- |
 | 역할 | React SPA를 전 세계에 빠르게 배포 |
 | 하위 모듈 | `cloudfront/`, `acm/` |
-| 주요 리소스 | CloudFront 배포(OAC, Origin Access Control — CloudFront가 S3 원본에 접근할 때 쓰는 접근 제한 방식. S3 버킷을 외부에 직접 공개하지 않고 CloudFront 경유로만 열람하도록 제한), ACM(AWS Certificate Manager) 인증서(HTTPS) |
+| 주요 리소스 | CloudFront 배포(OAC, Origin Access Control), ACM(AWS Certificate Manager) 인증서(HTTPS) |
+| 보안 설계 | OAC로 S3 직접 접근 차단(CloudFront 경유만 허용), HTTPS 강제 리다이렉트, JWT 검증용 Public Key는 별도 퍼블릭 버킷으로 분리 |
+| 특이사항 | 정적 자산을 CDN 캐싱해 응답 속도 향상 |
 
 ### `shared` — 공통 리소스
 
@@ -102,6 +112,8 @@
 | 역할 | 여러 레이어가 공통으로 쓰는 모니터링·보안 리소스 |
 | 하위 모듈 | `cloudwatch/`, `security_group/` |
 | 주요 리소스 | CloudWatch 로그그룹·알람·대시보드·Container Insights, 공통 Security Group |
+| 모니터링 역할 분담 | 주 모니터링은 Prometheus+Grafana(`ops` 참고)지만, EKS 노드·컨테이너 알람과 ARC 판단용 알람은 CloudWatch(Container Insights)로 병행 |
+| 특이사항 | 보안 그룹을 공통 모듈로 묶어 레이어 간 접근 규칙을 일관 관리 |
 
 ### `ops` — 운영·테스트 인프라
 
@@ -110,6 +122,8 @@
 | 역할 | 운영 도구와 부하 테스트 환경 제공 |
 | 구성 | `bastion.tf`, `test_ec2.tf`, `compose/`, `scripts/`, `templates/` |
 | 주요 리소스 | Bastion(Grafana docker compose 호스팅), test EC2(k6 부하 테스트), cAdvisor 컨테이너 메트릭 |
+| 모니터링 선택 | CloudWatch는 수집 주기 단축·커스텀 지표·트래픽 급증 시 메트릭당 과금으로 비용 증가 → **Prometheus+Grafana** 인프라 고정비만 발생해 지표를 늘려도 추가 과금 없이 비용 예측 가능 |
+| 특이사항 | bastion에서 Grafana 호스팅, k6(test EC2)로 SQS-Lambda-RDS 처리량 실측 검증 |
 
 ### `arc` — 가용성·장애 대응 (AZ 페일오버 · 트래픽 계층)
 
@@ -119,9 +133,9 @@
 | 구성 | NLB + ARC(Application Recovery Controller) Zonal Autoshift |
 | 주요 리소스 | `aws_arczonalshift_zonal_autoshift_configuration` (대상: NLB ARN) |
 | 감지 | NLB 비정상 호스트 합산 CloudWatch 알람 (`outcome_alarms`) |
-| 안전 장치 | `DISABLED` → 검증(Practice Run) 후 `ENABLED` (`zonal_autoshift_status`, `blocked_windows`/`blocked_dates`로 연습 차단) |
+| 안전 장치 | 오작동 시 정상 AZ까지 막을 위험이 있어 기본값 `DISABLED` → Practice Run(연습 실행) 검증 후 `ENABLED` (`zonal_autoshift_status`, `blocked_windows`/`blocked_dates`로 연습 시점 제어) |
 | 흐름 | NLB → 장애 AZ 제외 → 정상 AZ |
-| 비고 | AZ 페일오버의 데이터 계층은 위 `data` 모듈(RDS Multi-AZ + RDS Proxy)이 담당 |
+| 비고 | AZ 페일오버의 데이터 계층은 `data` 모듈(RDS Multi-AZ + RDS Proxy)이 담당 |
 
 ---
 
