@@ -174,15 +174,15 @@ terraform apply      # 실제 적용
 
 ### State 관리 (S3 백엔드)
 
-원격 state는 S3 백엔드로 관리하며, 설정은 `environments/dev/backend.tf`에 있습니다.
+원격 state는 S3 백엔드로 관리하며, dev/prod가 같은 버킷·락 테이블을 공유하고 `key` 경로로만 환경을 구분합니다.
 
-| 항목 | 값 |
-| --- | --- |
-| S3 버킷 | `tfstate-bucket-d8f5bb8d` |
-| state 키 | `dev/terraform.tfstate` |
-| 리전 | `ap-northeast-2` |
-| 잠금 테이블(DynamoDB) | `terraform-lock` |
-| 암호화 | `encrypt = true` |
+| 항목 | dev | prod |
+| --- | --- | --- |
+| S3 버킷 | `tfstate-bucket-d8f5bb8d` | `tfstate-bucket-d8f5bb8d` |
+| state 키 | `dev/terraform.tfstate` | `prod/terraform.tfstate` |
+| 리전 | `ap-northeast-2` | `ap-northeast-2` |
+| 잠금 테이블(DynamoDB) | `terraform-lock` | `terraform-lock` |
+| 암호화 | `encrypt = true` | `encrypt = true` |
 
 ### 민감 파일 관리 (.gitignore)
 
