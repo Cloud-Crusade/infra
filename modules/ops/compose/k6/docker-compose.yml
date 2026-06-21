@@ -5,6 +5,8 @@
 services:
   k6:
     image: grafana/k6:latest
+    env_file:
+      - .env
     profiles: ["manual"]
     working_dir: /scripts
     volumes:
