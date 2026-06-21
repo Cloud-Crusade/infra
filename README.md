@@ -280,4 +280,4 @@ resource "local_file" "ssh_key" {
 
 모듈별 설계 배경(검토한 대안, 트레이드오프, 회고)을 더 자세히 정리한 문서입니다.
 
-📄 [TicketWave 인프라 설계 문서 (Notion)](https://auspicious-blackbird-ed1.notion.site/TicketWave-Infra-Design-Document-386d8198f25781c08879e58c4958eb19?source=copy_link)
+📄 [TicketWave 인프라 설계 문서 (Notion)](https://pleasant-mustard-7f9.notion.site/C-C-Cloud-Crusade-36de8b70b7aa804fb619e80e3b80810e?source=copy_link)
