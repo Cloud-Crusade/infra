@@ -201,6 +201,7 @@ module "async" {
 
   reservation_endpoint               = module.data.reservation_proxy_endpoint
   waiting_room_cache_endpoint        = module.data.waiting_room_cache_endpoint
+  blacklist_cache_endpoint           = module.data.blacklist_cache_endpoint
   reservation_private_key_secret_arn = module.data.reservation_private_key_secret_arn
   authorization_secret_arn           = module.data.authorization_secret_arn
   cloudfront_domain_name             = module.frontend.cloudfront_domain_name

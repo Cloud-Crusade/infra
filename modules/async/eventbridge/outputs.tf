@@ -1,6 +1,6 @@
 output "event_bus_name" {
   description = "EventBridge Bus Name"
-  value       = aws_cloudwatch_event_bus.bot_detection.name
+  value       = "default"
 }
 
 output "event_rule_name" {

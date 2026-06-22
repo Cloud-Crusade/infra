@@ -52,6 +52,9 @@ module "apigateway" {
   authorizer_lambda_invoke_arn    = var.lambda_invoke_arns["authorizer"]
   authorizer_lambda_function_name = var.lambda_function_names["authorizer"]
 
+  bot_check_lambda_invoke_arn    = var.lambda_invoke_arns["bot_check"]
+  bot_check_lambda_function_name = var.lambda_function_names["bot_check"]
+
   api_domain_name = "api.${var.domain_name}"
   route53_zone_id = var.route53_zone_id
 }
