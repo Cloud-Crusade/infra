@@ -34,8 +34,9 @@ resource "aws_db_instance" "primary_replica" {
   instance_class      = var.instance_class
   replicate_source_db = aws_db_instance.primary.arn
 
-  # core 읽기: AZ1 은 primary(쓰기와 동일), AZ2 는 이 replica → AZ2 배치
-  availability_zone = var.azs[1]
+  # off(cross-zone): core 읽기 분산 위해 AZ2 고정(primary 는 AZ1). on: Multi-AZ standby 자동(AZ 는 AWS 결정)
+  availability_zone = var.multi_az ? null : var.azs[1]
+  multi_az          = var.multi_az
 
   db_subnet_group_name   = aws_db_subnet_group.db_sg.name
   vpc_security_group_ids = var.vpc_security_group_ids
@@ -75,8 +76,9 @@ resource "aws_db_instance" "reservation_replica" {
   instance_class      = var.instance_class
   replicate_source_db = aws_db_instance.reservation.arn
 
-  # 예약 읽기: AZ1 은 이 replica → AZ1 배치 (AZ2 는 reservation_replica_2)
-  availability_zone = var.azs[0]
+  # off(cross-zone): 예약 읽기 분산 위해 AZ1 고정(AZ2 는 reservation_replica_2). on: Multi-AZ standby 자동
+  availability_zone = var.multi_az ? null : var.azs[0]
+  multi_az          = var.multi_az
 
   db_subnet_group_name   = aws_db_subnet_group.db_sg.name
   vpc_security_group_ids = var.vpc_security_group_ids
@@ -92,7 +94,9 @@ resource "aws_db_instance" "reservation_replica_2" {
   instance_class      = var.instance_class
   replicate_source_db = aws_db_instance.reservation.arn
 
-  availability_zone = var.azs[1]
+  # off(cross-zone): AZ2 고정. on: Multi-AZ standby 자동(AZ 는 AWS 결정)
+  availability_zone = var.multi_az ? null : var.azs[1]
+  multi_az          = var.multi_az
 
   db_subnet_group_name   = aws_db_subnet_group.db_sg.name
   vpc_security_group_ids = var.vpc_security_group_ids
