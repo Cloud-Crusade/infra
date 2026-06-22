@@ -38,6 +38,11 @@ resource "kubernetes_deployment_v1" "this" {
     template {
       metadata {
         labels = local.labels
+        # CloudWatch Observability(OTel) 파이썬 자동계측이 구버전 protobuf 런타임을 주입해
+        # 앱 gRPC gencode(>=7.x)와 충돌(VersionError)→CrashLoop → 이 워크로드는 자동계측 제외.
+        annotations = {
+          "instrumentation.opentelemetry.io/inject-python" = "false"
+        }
       }
       spec {
         service_account_name             = kubernetes_service_account_v1.this.metadata[0].name
