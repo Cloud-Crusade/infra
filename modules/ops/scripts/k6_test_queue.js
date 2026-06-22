@@ -5,6 +5,8 @@ import sql from 'k6/x/sql';
 import driver from 'k6/x/sql/driver/postgres';
 // [공식 AWS 라이브러리] SQS 클라이언트 — SigV4 서명·SQS JSON 프로토콜을 내부에서 처리
 import { AWSConfig, SQSClient } from 'https://jslib.k6.io/aws/0.14.0/sqs.js';
+// reservations 테이블의 reservation_id·user_id·event_id 는 PG UUID 컬럼 → 유효 UUID 필요
+import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 
 // [5초 주기 지표] PostgreSQL 엔진이 실제로 처리한 '실질 초당 트래픽(Real TPS)' 분포
 const rdsIntervalRealTPS = new Trend('rds_actual_interval_tps');
@@ -57,11 +59,10 @@ function readWriteCount() {
     return count;
 }
 
-// [Mock 데이터 사양] 식별이 용이하도록 TEST- 접두사 일괄 적용
+// [Mock 데이터 사양] DB-무관 SQS 필드(messageId·groupId)는 식별용 TEST- 접두사 유지,
+// DB 컬럼(event_id)은 UUID 타입이라 식별 가능한 '고정 UUID'로 둔다(전 테스트 행이 동일 event).
 const MOCK_DATA = {
-    CONCERT_ID: 'TEST-CONCERT-2026',
-    USER_PREFIX: 'TEST-USER',
-    RESERVATION_PREFIX: 'TEST-REV',
+    EVENT_ID: '11111111-1111-4111-8111-111111111111', // 테스트 행 식별용 고정 event UUID
     GROUP_PREFIX: 'TEST-GROUP'
 };
 
@@ -98,12 +99,15 @@ export default async function (setupData) {
         const timestamp = Date.now();
         const uniqueId = `resv_${__VU}_${__ITER}_${i}_${timestamp}`;
 
-        // 요구사항 반영: 식별하기 편하도록 TEST- 접두사를 명시한 구조로 바디 조립
+        // persistence 소비자 계약(consumer._processRecord)에 맞춘 바디 —
+        // action 분기 + reservations INSERT 컬럼(reservation_id·user_id·event_id·reserved_num).
+        // UUID 컬럼이라 reservation_id·user_id 는 랜덤 UUID, event_id 는 고정 식별 UUID.
         const messageBody = JSON.stringify({
-            reservation_id: `${MOCK_DATA.RESERVATION_PREFIX}-${timestamp}-${__VU}-${__ITER}-${i}`,
-            user_id: `${MOCK_DATA.USER_PREFIX}-${__VU}-${i}`,
-            concert_id: MOCK_DATA.CONCERT_ID,
-            timestamp: timestamp
+            action: 'reservation.create',
+            reservation_id: uuidv4(),
+            user_id: uuidv4(),
+            event_id: MOCK_DATA.EVENT_ID,
+            reserved_num: (__ITER * 10) + i + 1
         });
 
         // FIFO 큐 옵션(MessageGroupId/MessageDeduplicationId)은 entry 의 messageOptions 로 전달
